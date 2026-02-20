@@ -1,0 +1,21 @@
+{
+    "manifest_version": 3,
+    "name": "Maps Premium Scraper",
+    "version": "1.0",
+    "description": "Premium workflow for extracting Google Maps location data.",
+    "action": {
+        "default_popup": "popup.html"
+    },
+    "permissions": [
+        "activeTab",
+        "scripting",
+        "downloads",
+        "storage"
+    ],
+    "host_permissions": [
+        "*://*/*"
+    ],
+    "background": {
+        "service_worker": "background.js"
+    }
+}
