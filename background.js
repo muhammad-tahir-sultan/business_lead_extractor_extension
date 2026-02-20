@@ -28,8 +28,48 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/gi;
                 const fbRegex = /https?:\/\/(www\.)?facebook\.com\/[^"'\s]+/gi;
                 const linkedinRegex = /https?:\/\/(www\.)?linkedin\.com\/(company|in)\/[^"'\s]+/gi;
-                let emails = [...new Set(html.match(emailRegex) || [])];
-                emails = emails.filter(e => !e.endsWith('.png') && !e.endsWith('.jpg') && !e.endsWith('.webp') && !e.endsWith('.jpeg') && !e.includes('sentry') && !e.includes('w3.org'));
+                // Known placeholder/example domains to skip
+                const SPAM_DOMAINS = new Set([
+                    'example.com', 'example.org', 'example.net',
+                    'email.com', 'mysite.com', 'yoursite.com',
+                    'domain.com', 'yourdomain.com', 'mydomain.com',
+                    'website.com', 'company.com', 'yourcompany.com',
+                    'test.com', 'test.org', 'placeholder.com',
+                    'samplesite.com', 'sample.com', 'mail.example'
+                ]);
+                // Generic/placeholder local parts to always skip
+                const SPAM_LOCALS = new Set([
+                    'email', 'user', 'name', 'username', 'yourname',
+                    'youremail', 'test', 'sample', 'example',
+                    'someone', 'person', 'owner'
+                ]);
+                // Major public providers — require longer local part (avoids abc@gmail.com)
+                const PUBLIC_PROVIDERS = new Set([
+                    'gmail.com', 'yahoo.com', 'yahoo.co.uk',
+                    'hotmail.com', 'outlook.com', 'live.com',
+                    'icloud.com', 'me.com', 'aol.com'
+                ]);
+
+                let emails = [...new Set((html.match(emailRegex) || []).map(e => e.toLowerCase()))];
+                emails = emails.filter(e => {
+                    // 1. Block image file extensions (including .gif for e.g. ajax-loader@2x.gif)
+                    if (/\.(png|jpg|jpeg|webp|gif|svg|ico|bmp)$/.test(e)) return false;
+                    // 2. Block known noise
+                    if (e.includes('sentry') || e.includes('w3.org')) return false;
+                    // 3. Reject version-string false positives (e.g. remixicon@3.3.0, bootstrap@5.0.2)
+                    const [local, domain] = e.split('@');
+                    if (!domain) return false;
+                    const tld = domain.split('.').pop();
+                    if (!tld || /^[\d.]+$/.test(tld)) return false;
+                    // 4. Block placeholder/example domains
+                    if (SPAM_DOMAINS.has(domain)) return false;
+                    // 5. Block generic placeholder local parts
+                    if (SPAM_LOCALS.has(local)) return false;
+                    // 6. On major public providers, require local part of at least 5 chars
+                    //    (blocks abc@gmail.com, aa@yahoo.com etc.)
+                    if (PUBLIC_PROVIDERS.has(domain) && local.length < 5) return false;
+                    return true;
+                });
                 const fbs = [...new Set(html.match(fbRegex) || [])];
                 const linkedins = [...new Set(html.match(linkedinRegex) || [])];
                 sendResponse({
