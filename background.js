@@ -94,6 +94,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         chrome.runtime.sendMessage({ action: 'ui_update', state: scrapingState }).catch(() => { });
     }
 
+    if (request.action === 'clear_data') {
+        scrapingState.data = [];
+        scrapingState.status = 'Ready to extract premium leads...';
+        saveState();
+        chrome.runtime.sendMessage({ action: 'ui_update', state: scrapingState }).catch(() => { });
+    }
+
     if (request.action === 'get_status') {
         sendResponse(scrapingState);
     }

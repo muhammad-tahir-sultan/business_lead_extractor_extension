@@ -374,6 +374,7 @@ function updateUI(state) {
     document.getElementById('export-excel-btn').disabled = !hasData;
     document.getElementById('append-sheet-btn').disabled = !hasData;
     document.getElementById('new-sheet-btn').disabled = !hasData;
+    document.getElementById('clear-results-btn').disabled = !hasData;
 }
 
 document.getElementById('start-btn').addEventListener('click', async () => {
@@ -601,4 +602,10 @@ document.getElementById('append-sheet-btn').addEventListener('click', () => {
 
 document.getElementById('new-sheet-btn').addEventListener('click', () => {
     sendToGoogleSheet('new_tab');
+});
+
+document.getElementById('clear-results-btn').addEventListener('click', () => {
+    if (confirm("Are you sure you want to delete all extracted leads from memory?")) {
+        chrome.runtime.sendMessage({ action: 'clear_data' });
+    }
 });
