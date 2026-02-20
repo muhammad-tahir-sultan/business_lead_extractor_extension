@@ -216,6 +216,139 @@ const businessSuggestions = [
     { text: "Massage Therapy in Zurich", cat: "HEALTH" }
 ];
 
+// Business type niches for Location Builder autocomplete
+const BUSINESS_NICHES = [
+    // Tech
+    { label: "Software House", cat: "Tech" },
+    { label: "Web Development Agency", cat: "Tech" },
+    { label: "Mobile App Development", cat: "Tech" },
+    { label: "IT Consulting Firm", cat: "Tech" },
+    { label: "Cybersecurity Company", cat: "Tech" },
+    { label: "Digital Marketing Agency", cat: "Tech" },
+    { label: "SEO Agency", cat: "Tech" },
+    { label: "AI Startup", cat: "Tech" },
+    { label: "Data Analytics Firm", cat: "Tech" },
+    { label: "Cloud Solutions Provider", cat: "Tech" },
+    { label: "E-commerce Agency", cat: "Tech" },
+    { label: "UI/UX Design Studio", cat: "Tech" },
+    { label: "Game Development Studio", cat: "Tech" },
+    { label: "Blockchain Company", cat: "Tech" },
+    { label: "Drone Services Company", cat: "Tech" },
+    // Health
+    { label: "Dentist", cat: "Health" },
+    { label: "Medical Clinic", cat: "Health" },
+    { label: "Pharmacy", cat: "Health" },
+    { label: "Physiotherapy Clinic", cat: "Health" },
+    { label: "Chiropractic Clinic", cat: "Health" },
+    { label: "Dermatologist", cat: "Health" },
+    { label: "Eye Clinic", cat: "Health" },
+    { label: "Orthodontist", cat: "Health" },
+    { label: "Pediatric Clinic", cat: "Health" },
+    { label: "Plastic Surgery Clinic", cat: "Health" },
+    { label: "Mental Health Clinic", cat: "Health" },
+    { label: "Veterinary Clinic", cat: "Health" },
+    { label: "Home Health Care", cat: "Health" },
+    { label: "Acupuncture Clinic", cat: "Health" },
+    { label: "Nutrition Consultant", cat: "Health" },
+    // Legal & Finance
+    { label: "Law Firm", cat: "Legal" },
+    { label: "Family Lawyer", cat: "Legal" },
+    { label: "Immigration Lawyer", cat: "Legal" },
+    { label: "Personal Injury Lawyer", cat: "Legal" },
+    { label: "Accounting Firm", cat: "Finance" },
+    { label: "Tax Consultancy", cat: "Finance" },
+    { label: "Financial Advisor", cat: "Finance" },
+    { label: "Insurance Agency", cat: "Finance" },
+    { label: "Mortgage Broker", cat: "Finance" },
+    { label: "Investment Firm", cat: "Finance" },
+    // Real Estate
+    { label: "Real Estate Agency", cat: "Property" },
+    { label: "Property Management", cat: "Property" },
+    { label: "Interior Design Studio", cat: "Property" },
+    { label: "Architectural Firm", cat: "Property" },
+    { label: "Construction Company", cat: "Property" },
+    { label: "Home Renovation Company", cat: "Property" },
+    // Education
+    { label: "Tutoring Center", cat: "Education" },
+    { label: "Language School", cat: "Education" },
+    { label: "Driving School", cat: "Education" },
+    { label: "Music School", cat: "Education" },
+    { label: "Coding Bootcamp", cat: "Education" },
+    { label: "Montessori School", cat: "Education" },
+    { label: "Vocational Training Center", cat: "Education" },
+    // Food & Beverage
+    { label: "Restaurant", cat: "Food" },
+    { label: "Cafe", cat: "Food" },
+    { label: "Bakery", cat: "Food" },
+    { label: "Catering Service", cat: "Food" },
+    { label: "Food Delivery Service", cat: "Food" },
+    { label: "Juice Bar", cat: "Food" },
+    { label: "Ice Cream Shop", cat: "Food" },
+    { label: "Cloud Kitchen", cat: "Food" },
+    // Beauty & Wellness
+    { label: "Hair Salon", cat: "Beauty" },
+    { label: "Barber Shop", cat: "Beauty" },
+    { label: "Nail Salon", cat: "Beauty" },
+    { label: "Spa", cat: "Beauty" },
+    { label: "Massage Therapy Center", cat: "Beauty" },
+    { label: "Yoga Studio", cat: "Beauty" },
+    { label: "Gym", cat: "Beauty" },
+    { label: "Personal Trainer", cat: "Beauty" },
+    { label: "Tattoo Parlor", cat: "Beauty" },
+    // Retail & E-commerce
+    { label: "Clothing Store", cat: "Retail" },
+    { label: "Electronics Store", cat: "Retail" },
+    { label: "Jewelry Store", cat: "Retail" },
+    { label: "Furniture Store", cat: "Retail" },
+    { label: "Bookstore", cat: "Retail" },
+    { label: "Gift Shop", cat: "Retail" },
+    { label: "Sports Equipment Store", cat: "Retail" },
+    { label: "Toy Store", cat: "Retail" },
+    { label: "Grocery Store", cat: "Retail" },
+    { label: "Pet Shop", cat: "Retail" },
+    { label: "Pharmacy Store", cat: "Retail" },
+    // Auto
+    { label: "Car Dealership", cat: "Auto" },
+    { label: "Auto Repair Shop", cat: "Auto" },
+    { label: "Car Wash", cat: "Auto" },
+    { label: "Tire Shop", cat: "Auto" },
+    { label: "Car Detailing", cat: "Auto" },
+    { label: "Car Rental", cat: "Auto" },
+    { label: "Motorcycle Shop", cat: "Auto" },
+    // Home Services
+    { label: "Plumber", cat: "Home" },
+    { label: "Electrician", cat: "Home" },
+    { label: "HVAC Services", cat: "Home" },
+    { label: "Pest Control", cat: "Home" },
+    { label: "Cleaning Service", cat: "Home" },
+    { label: "Locksmith", cat: "Home" },
+    { label: "Roofing Contractor", cat: "Home" },
+    { label: "Landscaping Company", cat: "Home" },
+    { label: "Moving Company", cat: "Home" },
+    { label: "Solar Panel Installer", cat: "Home" },
+    { label: "Smart Home Installer", cat: "Home" },
+    // Travel & Events
+    { label: "Travel Agency", cat: "Travel" },
+    { label: "Hotel", cat: "Travel" },
+    { label: "Event Management Company", cat: "Events" },
+    { label: "Wedding Planner", cat: "Events" },
+    { label: "Photography Studio", cat: "Events" },
+    { label: "Video Production Company", cat: "Events" },
+    { label: "DJ Services", cat: "Events" },
+    { label: "Limousine Service", cat: "Travel" },
+    // Logistics & B2B
+    { label: "Logistics Company", cat: "B2B" },
+    { label: "Courier Service", cat: "B2B" },
+    { label: "Warehousing Company", cat: "B2B" },
+    { label: "Staffing Agency", cat: "B2B" },
+    { label: "Security Guard Service", cat: "B2B" },
+    { label: "Co-working Space", cat: "B2B" },
+    { label: "Printing Service", cat: "B2B" },
+    { label: "Translation Service", cat: "B2B" },
+    { label: "Advertising Agency", cat: "B2B" },
+    { label: "PR Agency", cat: "B2B" },
+];
+
 let scrapedData = [];
 
 // Initialize UI from background state
@@ -315,6 +448,225 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     }
+
+    // ── Location Builder ─────────────────────────────────────────────
+    const locationBuilderBtn = document.getElementById('location-builder-btn');
+    const locationBuilderPanel = document.getElementById('location-builder-panel');
+    const closeLocationBtn = document.getElementById('close-location-btn');
+    const locCountry = document.getElementById('loc-country');
+    const locProvince = document.getElementById('loc-province');
+    const locCity = document.getElementById('loc-city');
+    const locBusiness = document.getElementById('loc-business');
+    const locPreview = document.getElementById('loc-preview');
+    const locPreviewText = document.getElementById('loc-preview-text');
+    const locComposeBtn = document.getElementById('loc-compose-btn');
+    const provinceField = document.getElementById('province-field');
+    const cityField = document.getElementById('city-field');
+    const provinceLabel = document.getElementById('province-label');
+
+    // Populate country dropdown from bundled data
+    Object.keys(LOCATIONS_DATA).sort().forEach(country => {
+        const opt = document.createElement('option');
+        opt.value = country;
+        opt.textContent = country;
+        locCountry.appendChild(opt);
+    });
+
+    locationBuilderBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const isVisible = locationBuilderPanel.style.display === 'block';
+        locationBuilderPanel.style.display = isVisible ? 'none' : 'block';
+        if (!isVisible) libraryView.style.display = 'none'; // close library if open
+    });
+
+    closeLocationBtn.addEventListener('click', () => {
+        locationBuilderPanel.style.display = 'none';
+    });
+
+    function updateLocPreview() {
+        const business = locBusiness.value.trim();
+        const city = locCity.value;
+        if (business && city) {
+            locPreviewText.textContent = `${business} in ${city}`;
+            locPreview.style.display = 'flex';
+            locComposeBtn.disabled = false;
+        } else {
+            locPreview.style.display = 'none';
+            locComposeBtn.disabled = true;
+        }
+    }
+
+    const bizSuggestionsList = document.getElementById('business-suggestions-list');
+    let bizHighlightIndex = -1;
+
+    function renderBizSuggestions(value) {
+        const query = value.toLowerCase().trim();
+        bizHighlightIndex = -1;
+
+        if (!query) {
+            bizSuggestionsList.classList.remove('active');
+            bizSuggestionsList.innerHTML = '';
+            return;
+        }
+
+        const matched = BUSINESS_NICHES.filter(n =>
+            n.label.toLowerCase().includes(query) || n.cat.toLowerCase().includes(query)
+        ).slice(0, 8);
+
+        if (matched.length === 0) {
+            bizSuggestionsList.classList.remove('active');
+            bizSuggestionsList.innerHTML = '';
+            return;
+        }
+
+        bizSuggestionsList.innerHTML = matched.map((n, i) =>
+            `<div class="business-suggestion-item" data-value="${n.label}" data-index="${i}">
+                <span class="biz-cat-tag">${n.cat}</span>
+                ${n.label}
+            </div>`
+        ).join('');
+        bizSuggestionsList.classList.add('active');
+
+        bizSuggestionsList.querySelectorAll('.business-suggestion-item').forEach(item => {
+            item.addEventListener('mousedown', (e) => {
+                e.preventDefault(); // prevent blur firing first
+                locBusiness.value = item.dataset.value;
+                bizSuggestionsList.classList.remove('active');
+                updateLocPreview();
+            });
+        });
+    }
+
+    locBusiness.addEventListener('input', (e) => {
+        renderBizSuggestions(e.target.value);
+        updateLocPreview();
+    });
+
+    // Keyboard navigation: ↑ ↓ Enter Escape
+    locBusiness.addEventListener('keydown', (e) => {
+        const items = bizSuggestionsList.querySelectorAll('.business-suggestion-item');
+        if (!items.length) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            bizHighlightIndex = Math.min(bizHighlightIndex + 1, items.length - 1);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            bizHighlightIndex = Math.max(bizHighlightIndex - 1, 0);
+        } else if (e.key === 'Enter' && bizHighlightIndex >= 0) {
+            e.preventDefault();
+            locBusiness.value = items[bizHighlightIndex].dataset.value;
+            bizSuggestionsList.classList.remove('active');
+            updateLocPreview();
+            return;
+        } else if (e.key === 'Escape') {
+            bizSuggestionsList.classList.remove('active');
+            return;
+        } else {
+            return;
+        }
+        items.forEach(el => el.classList.remove('highlighted'));
+        if (bizHighlightIndex >= 0) {
+            items[bizHighlightIndex].classList.add('highlighted');
+            items[bizHighlightIndex].scrollIntoView({ block: 'nearest' });
+        }
+    });
+
+    locBusiness.addEventListener('blur', () => {
+        setTimeout(() => bizSuggestionsList.classList.remove('active'), 150);
+    });
+
+
+
+    locCountry.addEventListener('change', () => {
+        const country = locCountry.value;
+        // Reset downstream dropdowns
+        locProvince.innerHTML = '<option value="">Select Province / State</option>';
+        locCity.innerHTML = '<option value="">Select City</option>';
+        cityField.style.display = 'none';
+        locPreview.style.display = 'none';
+        locComposeBtn.disabled = true;
+
+        if (!country) {
+            provinceField.style.display = 'none';
+            return;
+        }
+
+        // Rename "Province" label contextually per country
+        const labelMap = {
+            'United States': 'State', 'Canada': 'Province',
+            'Australia': 'State', 'Germany': 'State',
+            'United Kingdom': 'Region', 'India': 'State',
+            'United Arab Emirates': 'Emirate', 'Saudi Arabia': 'Region',
+            'Singapore': 'Region', 'Pakistan': 'Province'
+        };
+        provinceLabel.textContent = labelMap[country] || 'Province';
+
+        const provinces = LOCATIONS_DATA[country];
+        const provinceKeys = Object.keys(provinces);
+
+        // If only one province (e.g. Singapore), silently auto-select it
+        if (provinceKeys.length === 1) {
+            const onlyProvince = provinceKeys[0];
+            const opt = document.createElement('option');
+            opt.value = onlyProvince;
+            opt.textContent = onlyProvince;
+            locProvince.appendChild(opt);
+            locProvince.value = onlyProvince;
+            provinceField.style.display = 'flex';
+            locProvince.dispatchEvent(new Event('change'));
+        } else {
+            provinceKeys.sort().forEach(prov => {
+                const opt = document.createElement('option');
+                opt.value = prov;
+                opt.textContent = prov;
+                locProvince.appendChild(opt);
+            });
+            provinceField.style.display = 'flex';
+        }
+    });
+
+    locProvince.addEventListener('change', () => {
+        const country = locCountry.value;
+        const province = locProvince.value;
+        locCity.innerHTML = '<option value="">Select City</option>';
+        locPreview.style.display = 'none';
+        locComposeBtn.disabled = true;
+
+        if (!province) {
+            cityField.style.display = 'none';
+            return;
+        }
+
+        const cities = (LOCATIONS_DATA[country] || {})[province] || [];
+        cities.forEach(city => {
+            const opt = document.createElement('option');
+            opt.value = city;
+            opt.textContent = city;
+            locCity.appendChild(opt);
+        });
+        cityField.style.display = 'flex';
+        updateLocPreview();
+    });
+
+    locCity.addEventListener('change', updateLocPreview);
+
+    locComposeBtn.addEventListener('click', () => {
+        const business = locBusiness.value.trim();
+        const city = locCity.value;
+        if (!business || !city) return;
+        keywordInput.value = `${business} in ${city}`;
+        locationBuilderPanel.style.display = 'none';
+        suggestionsList.classList.remove('active');
+        // Green flash on keyword input to confirm
+        keywordInput.style.borderColor = '#34d399';
+        keywordInput.style.boxShadow = '0 0 0 4px rgba(52, 211, 153, 0.2)';
+        setTimeout(() => {
+            keywordInput.style.borderColor = '';
+            keywordInput.style.boxShadow = '';
+        }, 1200);
+    });
+    // ── End Location Builder ─────────────────────────────────────────
 
     keywordInput.addEventListener('input', (e) => {
         const value = e.target.value.toLowerCase();

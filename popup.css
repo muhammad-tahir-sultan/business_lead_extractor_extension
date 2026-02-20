@@ -12,12 +12,11 @@
 }
 
 body {
-    width: 500px;
+    width: 650px;
     margin: 0;
     font-family: 'Outfit', sans-serif;
     background: var(--bg-dark);
     color: var(--text-main);
-    overflow-x: hidden;
 }
 
 .glass-container {
@@ -26,7 +25,7 @@ body {
         radial-gradient(circle at 0% 0%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
         radial-gradient(circle at 100% 100%, rgba(192, 132, 252, 0.1) 0%, transparent 50%),
         linear-gradient(180deg, rgba(15, 23, 42, 1) 0%, rgba(30, 41, 59, 1) 100%);
-    min-height: 480px;
+    min-height: 550px;
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -520,4 +519,281 @@ button {
 
 .scraping .status-text {
     animation: pulse 1.5s infinite;
+}
+
+/* ── Label row with two links ──────────────────────────── */
+.label-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.location-link {
+    background: linear-gradient(to right, #34d399, #059669);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-size: 10px;
+}
+
+/* ── Location Builder Panel ────────────────────────────── */
+.location-builder-panel {
+    margin-top: -10px;
+    margin-bottom: 20px;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(52, 211, 153, 0.2);
+    border-radius: 14px;
+    overflow: hidden;
+    animation: slideDown 0.25s ease-out;
+}
+
+.location-builder-header {
+    background: linear-gradient(135deg, rgba(52, 211, 153, 0.12), rgba(5, 150, 105, 0.08));
+    padding: 9px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: #34d399;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-bottom: 1px solid rgba(52, 211, 153, 0.1);
+}
+
+.close-panel-btn {
+    background: none;
+    padding: 0;
+    margin: 0;
+    width: auto;
+    font-size: 18px;
+    color: var(--text-muted);
+    line-height: 1;
+}
+
+.close-panel-btn:hover {
+    color: var(--danger);
+}
+
+.location-builder-body {
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Row of dropdowns side by side */
+.loc-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.loc-row .loc-field {
+    flex: 1;
+    min-width: 110px;
+}
+
+.loc-field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.loc-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+}
+
+/* Custom styled select */
+.custom-select-wrapper {
+    position: relative;
+}
+
+.loc-select {
+    width: 100%;
+    box-sizing: border-box;
+    appearance: none;
+    -webkit-appearance: none;
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 9px 30px 9px 12px;
+    color: var(--text-main);
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    outline: none;
+}
+
+.loc-select:focus,
+.loc-select:hover {
+    border-color: #34d399;
+    box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.12);
+}
+
+/* Disabled cascaded dropdowns look */
+.loc-select:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.select-arrow {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
+    font-size: 12px;
+    transition: color 0.2s;
+}
+
+.custom-select-wrapper:has(.loc-select:focus) .select-arrow {
+    color: #34d399;
+}
+
+/* Slide-in animations for province & city */
+#province-field,
+#city-field {
+    animation: fadeSlideIn 0.2s ease-out;
+}
+
+@keyframes fadeSlideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-6px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Live preview badge */
+.loc-preview {
+    background: rgba(52, 211, 153, 0.07);
+    border: 1px solid rgba(52, 211, 153, 0.2);
+    border-radius: 8px;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: fadeSlideIn 0.2s ease-out;
+}
+
+.loc-preview-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #34d399;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+.loc-preview-text {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-main);
+    word-break: break-word;
+}
+
+/* Compose CTA button */
+.loc-compose-btn {
+    width: 100%;
+    padding: 11px;
+    background: linear-gradient(135deg, #059669, #34d399);
+    color: white;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    box-shadow: 0 4px 14px rgba(5, 150, 105, 0.3);
+    transition: all 0.2s ease;
+    gap: 6px;
+}
+
+.loc-compose-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(5, 150, 105, 0.4);
+}
+
+.loc-compose-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* ── Business Type suggestions dropdown ────────────────── */
+.business-suggestions-list {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    max-height: 200px;
+    background: #1a2744;
+    border: 1px solid rgba(52, 211, 153, 0.25);
+    border-radius: 10px;
+    overflow-y: auto;
+    z-index: 2000;
+    display: none;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+}
+
+.business-suggestions-list.active {
+    display: block;
+}
+
+.business-suggestion-item {
+    padding: 8px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-main);
+}
+
+.business-suggestion-item:last-child {
+    border-bottom: none;
+}
+
+.business-suggestion-item:hover,
+.business-suggestion-item.highlighted {
+    background: rgba(52, 211, 153, 0.12);
+    color: #34d399;
+    padding-left: 18px;
+}
+
+.business-suggestion-item .biz-cat-tag {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #34d399;
+    background: rgba(52, 211, 153, 0.1);
+    border: 1px solid rgba(52, 211, 153, 0.2);
+    border-radius: 4px;
+    padding: 1px 5px;
+    flex-shrink: 0;
+}
+
+/* Scrollbar */
+.business-suggestions-list::-webkit-scrollbar {
+    width: 5px;
+}
+
+.business-suggestions-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.business-suggestions-list::-webkit-scrollbar-thumb {
+    background: rgba(52, 211, 153, 0.25);
+    border-radius: 3px;
 }
