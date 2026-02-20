@@ -2,7 +2,7 @@
 
 LeadGen Maps is a premium Chrome extension designed for efficient and high-quality lead extraction from Google Maps. It empowers businesses to find and export targeted local leads with ease, featuring advanced filtering and multiple export formats.
 
-![LeadGen Maps Interface](https://via.placeholder.com/800x400?text=LeadGen+Maps+Interface)
+![LeadGen Maps Interface](assets/banner.png)
 
 ## 🚀 Features
 
