@@ -808,6 +808,19 @@ button {
     border-radius: 3px;
 }
 
+#sheet-select-dropdown option {
+    background-color: #0f172a;
+    color: #f8fafc;
+    font-size: 14px;
+    padding: 12px;
+}
+
+#sheet-select-dropdown:focus {
+    border-color: #6366f1 !important;
+    background: rgba(15, 23, 42, 0.8) !important;
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15) !important;
+}
+
 @keyframes spin {
     from {
         transform: rotate(0deg);
