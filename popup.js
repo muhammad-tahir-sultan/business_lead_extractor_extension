@@ -823,7 +823,7 @@ document.getElementById('export-csv-btn').addEventListener('click', () => {
             `"${item.reviews || ''}"`,
             `"${(item.url || '').replace(/"/g, '""')}"`,
             `"${(item.website || '').replace(/"/g, '""')}"`,
-            `"${(item.contact || '').replace(/"/g, '""')}"`,
+            `"${(item.contact ? (item.contact.match(/^[+\-=@]/) ? "'" + item.contact : item.contact) : '').replace(/"/g, '""')}"`,
             `"${(item.emails || '').replace(/"/g, '""')}"`,
             `""`, // text_snippet
             `""`, // Sent Status
@@ -856,7 +856,7 @@ document.getElementById('export-excel-btn').addEventListener('click', () => {
         'reviews': item.reviews || '',
         'url': item.url || '',
         'website': item.website || '',
-        'phone': item.contact || '',
+        'phone': item.contact ? (item.contact.match(/^[+\-=@]/) ? "'" + item.contact : item.contact) : '',
         'email': item.emails || '',
         'text_snippet': '',
         'Sent Status': '',
@@ -886,7 +886,7 @@ document.getElementById('export-excel-btn').addEventListener('click', () => {
     });
 });
 
-async function sendToGoogleSheet(actionStr) {
+async function sendToGoogleSheet(actionStr, options = {}) {
     if (scrapedData.length === 0) return;
 
     chrome.storage.local.get(['webAppUrl'], async (result) => {
@@ -907,7 +907,7 @@ async function sendToGoogleSheet(actionStr) {
             'reviews': item.reviews || '',
             'url': item.url || '',
             'website': item.website || '',
-            'phone': item.contact || '',
+            'phone': item.contact ? (item.contact.match(/^[+\-=@]/) ? "'" + item.contact : item.contact) : '',
             'email': item.emails || '',
             'text_snippet': '',
             'Sent Status': '',
@@ -924,9 +924,12 @@ async function sendToGoogleSheet(actionStr) {
         document.getElementById('append-sheet-btn').disabled = true;
         document.getElementById('new-sheet-btn').disabled = true;
 
+        const query = document.getElementById('keyword').value.trim() || 'Leads';
         const payload = {
             action: actionStr,
-            data: data
+            data: data,
+            query: query,
+            ...options
         };
 
         try {
@@ -966,12 +969,89 @@ async function sendToGoogleSheet(actionStr) {
     });
 }
 
-document.getElementById('append-sheet-btn').addEventListener('click', () => {
-    sendToGoogleSheet('append');
+// --- New Tab Export Logic ---
+document.getElementById('new-sheet-btn').addEventListener('click', () => {
+    const defaultQueryName = document.getElementById('keyword').value.trim() || 'Leads';
+    const suggestedTabName = defaultQueryName.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') + ' - ' + new Date().toLocaleTimeString();
+
+    const customTabName = prompt("Enter the name for the new Google Sheets tab:", suggestedTabName);
+
+    // If user presses Cancel, do nothing
+    if (customTabName === null) return;
+
+    // Send to Google Sheet with provided tabName (even if empty, Apps Script will fallback)
+    sendToGoogleSheet('new_tab', { tabName: customTabName.trim() });
 });
 
-document.getElementById('new-sheet-btn').addEventListener('click', () => {
-    sendToGoogleSheet('new_tab');
+// --- Append to Existing Sheet Logic (Modal) ---
+const sheetSelectorModal = document.getElementById('sheet-selector-modal');
+const sheetSelectDropdown = document.getElementById('sheet-select-dropdown');
+const closeSheetSelectorBtn = document.getElementById('close-sheet-selector-btn');
+const sheetSelectorLoading = document.getElementById('sheet-selector-loading');
+const sheetSelectorContent = document.getElementById('sheet-selector-content');
+const confirmAppendBtn = document.getElementById('confirm-append-btn');
+
+document.getElementById('append-sheet-btn').addEventListener('click', () => {
+    if (scrapedData.length === 0) return;
+
+    chrome.storage.local.get(['webAppUrl'], async (result) => {
+        let webAppUrl = result.webAppUrl;
+        if (!webAppUrl) {
+            webAppUrl = prompt("Please enter your deployed Google Apps Script Web App URL:", "https://script.google.com/macros/s/AKfycbw6CR94M7pfTQlEgXpYdzxOsf9xcVt0VORG7KqCCuNN-E_5x1vVoL_xC16HG4XufUGcJw/exec");
+            if (webAppUrl) {
+                chrome.storage.local.set({ webAppUrl: webAppUrl });
+            } else {
+                return;
+            }
+        }
+
+        // Show Modal in loading state
+        sheetSelectorModal.style.display = 'block';
+        sheetSelectorLoading.style.display = 'block';
+        sheetSelectorContent.style.display = 'none';
+
+        try {
+            const response = await fetch(webAppUrl, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'get_sheets' }),
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            });
+            const resultData = await response.json();
+
+            if (resultData.status === 'success' && resultData.sheets) {
+                // Populate dropdown
+                sheetSelectDropdown.innerHTML = '';
+                resultData.sheets.forEach(sheetName => {
+                    const option = document.createElement('option');
+                    option.value = sheetName;
+                    option.textContent = sheetName;
+                    sheetSelectDropdown.appendChild(option);
+                });
+
+                sheetSelectorLoading.style.display = 'none';
+                sheetSelectorContent.style.display = 'flex';
+            } else {
+                alert("Failed to fetch sheets: " + (resultData.message || "Unknown error"));
+                sheetSelectorModal.style.display = 'none';
+            }
+        } catch (error) {
+            console.error('Error fetching sheets:', error);
+            alert("Error connecting to Google Sheets to fetch tabs.");
+            sheetSelectorModal.style.display = 'none';
+        }
+    });
+});
+
+closeSheetSelectorBtn.addEventListener('click', () => {
+    sheetSelectorModal.style.display = 'none';
+});
+
+confirmAppendBtn.addEventListener('click', () => {
+    const selectedSheet = sheetSelectDropdown.value;
+    if (!selectedSheet) return;
+
+    sheetSelectorModal.style.display = 'none';
+    sendToGoogleSheet('append', { sheetName: selectedSheet });
 });
 
 document.getElementById('clear-results-btn').addEventListener('click', () => {

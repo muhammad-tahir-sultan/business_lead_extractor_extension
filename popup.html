@@ -232,6 +232,45 @@
             </div>
         </div>
 
+        <!-- Sheet Selector Modal -->
+        <div id="sheet-selector-modal" class="library-view" style="display: none; padding: 24px; z-index: 3000;">
+            <div class="library-header" style="margin-bottom: 20px;">
+                <h2 style="font-size: 16px; margin: 0; color: white;">Select Sheet to Append</h2>
+                <button id="close-sheet-selector-btn" class="icon-btn"
+                    style="color: var(--text-muted);">&times;</button>
+            </div>
+
+            <div id="sheet-selector-loading" style="text-align: center; padding: 30px 10px; color: var(--text-muted);">
+                <div style="margin-bottom: 12px;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite;">
+                        <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+                    </svg>
+                </div>
+                Connecting to Google Sheets...
+            </div>
+
+            <div id="sheet-selector-content" style="display: none; flex-direction: column; gap: 16px;">
+                <p style="font-size: 13px; color: var(--text-muted); margin: 0;">Choose an existing tab to append the
+                    leads to:</p>
+                <div style="position: relative;">
+                    <select id="sheet-select-dropdown"
+                        style="width: 100%; padding: 14px 16px; border-radius: 12px; background: rgba(0,0,0,0.2); border: 1px solid var(--border); color: white; font-family: 'Outfit', sans-serif; font-size: 14px; appearance: none; cursor: pointer; outline: none; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                    </select>
+                    <!-- Custom dropdown arrow -->
+                    <div style="position: absolute; right: 16px; top: 18px; pointer-events: none; color: white;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                </div>
+                <button id="confirm-append-btn" class="primary-btn" style="width: 100%; margin-top: 8px;">
+                    Append Leads
+                </button>
+            </div>
+        </div>
+
         <div class="footer">
             <span>Powered by LeadGen v2.0</span>
         </div>

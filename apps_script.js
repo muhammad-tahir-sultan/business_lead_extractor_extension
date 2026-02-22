@@ -25,9 +25,25 @@ function doPost(e) {
 
             appendDataToSheet(sheet, expectedHeaders, data);
         }
+        else if (action === 'get_sheets') {
+            var sheets = spreadsheet.getSheets();
+            var sheetNames = sheets.map(function (s) { return s.getName(); });
+            return ContentService.createTextOutput(JSON.stringify({ "status": "success", "sheets": sheetNames }))
+                .setMimeType(ContentService.MimeType.JSON);
+        }
         else if (action === 'new_tab') {
-            var newTabName = 'Leads - ' + new Date().toLocaleTimeString();
-            sheet = spreadsheet.insertSheet(newTabName);
+            if (payload.tabName) {
+                var newTabName = payload.tabName;
+                sheet = spreadsheet.insertSheet(newTabName);
+            } else {
+                var queryName = payload.query || 'Leads';
+                // Capitalize the first letter of each word for a clean tab name
+                queryName = queryName.split(' ').map(function (word) {
+                    return word.charAt(0).toUpperCase() + word.slice(1);
+                }).join(' ');
+                var newTabName = queryName + ' - ' + new Date().toLocaleTimeString();
+                sheet = spreadsheet.insertSheet(newTabName);
+            }
 
             sheet.appendRow(expectedHeaders);
             sheet.getRange("A1:P1").setFontWeight("bold").setBackground("#f3f3f3");
@@ -36,7 +52,14 @@ function doPost(e) {
             appendDataToSheet(sheet, expectedHeaders, data);
         }
         else {
-            sheet = spreadsheet.getActiveSheet();
+            if (payload.sheetName) {
+                sheet = spreadsheet.getSheetByName(payload.sheetName);
+                if (!sheet) {
+                    sheet = spreadsheet.getActiveSheet();
+                }
+            } else {
+                sheet = spreadsheet.getActiveSheet();
+            }
             var lastCol = Math.max(sheet.getLastColumn(), 1);
             var lastRow = Math.max(sheet.getLastRow(), 1);
 
