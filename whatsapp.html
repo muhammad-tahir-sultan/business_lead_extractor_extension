@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Blast Dashboard - LeadGen Maps</title>
+    <!-- Google Fonts for typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="whatsapp.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo-area">
+                <div class="logo-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path
+                            d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z">
+                        </path>
+                    </svg>
+                </div>
+                <div>
+                    <h1>WA <span>Blast</span></h1>
+                    <p class="subtitle">Auto-Messaging Engine</p>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <div class="nav-step active" id="nav-step-1">
+                    <div class="step-num">1</div>
+                    Data Source
+                </div>
+                <div class="nav-step" id="nav-step-2">
+                    <div class="step-num">2</div>
+                    Compose Message
+                </div>
+                <div class="nav-step" id="nav-step-3">
+                    <div class="step-num">3</div>
+                    Configuration
+                </div>
+                <div class="nav-step" id="nav-step-4">
+                    <div class="step-num">4</div>
+                    Launch Campaign
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button id="back-to-extension-btn" class="nav-btn-secondary">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
+                    Back to Maps
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <div class="glass-panel">
+                <div class="panel-header">
+                    <h2 id="panel-title">Select Data Source</h2>
+                    <span id="leads-count-badge" class="badge bg-indigo">0 Leads Ready</span>
+                </div>
+
+                <div class="panel-body">
+                    <!-- Step 1: Data Source -->
+                    <div id="step-1-content" class="step-content active">
+                        <div class="source-options">
+                            <label class="source-card active" id="source-scraped">
+                                <input type="radio" name="source_type" value="scraped" checked>
+                                <div class="card-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="2">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="7 10 12 15 17 10"></polyline>
+                                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                                    </svg></div>
+                                <div class="card-text">
+                                    <h3>Scraped Maps Data</h3>
+                                    <p>Use leads currently stored in the extension's memory from your latest Google Maps
+                                        extraction.</p>
+                                </div>
+                                <div class="check-circle"></div>
+                            </label>
+
+                            <label class="source-card" id="source-upload">
+                                <input type="radio" name="source_type" value="upload">
+                                <div class="card-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="2">
+                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                        <line x1="16" y1="8" x2="8" y2="8"></line>
+                                        <line x1="16" y1="16" x2="8" y2="16"></line>
+                                        <line x1="10" y1="12" x2="8" y2="12"></line>
+                                    </svg></div>
+                                <div class="card-text">
+                                    <h3>Upload Custom File</h3>
+                                    <p>Upload a CSV, JSON, or paste a public Google Sheets link.</p>
+                                </div>
+                                <div class="check-circle"></div>
+                            </label>
+                        </div>
+
+                        <div id="upload-zone" class="upload-zone" style="display: none;">
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
+                                style="color: var(--primary); margin-bottom: 12px; opacity: 0.8;">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" y1="3" x2="12" y2="15"></line>
+                            </svg>
+                            <h3 style="margin: 0; font-size: 16px;">Drag & Drop CSV / JSON</h3>
+                            <p style="color: var(--text-muted); font-size: 13px; margin: 4px 0 16px 0;">or click to
+                                browse files</p>
+                            <input type="file" id="file-upload" accept=".csv, .json" style="display: none;">
+                            <button class="nav-btn-secondary"
+                                onclick="document.getElementById('file-upload').click()">Browse Files</button>
+
+                            <div class="divider"><span>OR</span></div>
+
+                            <div class="input-group">
+                                <label>Public Google Sheet URL</label>
+                                <input type="text" id="sheet-url-input"
+                                    placeholder="https://docs.google.com/spreadsheets/d/.../edit?usp=sharing">
+                            </div>
+                        </div>
+
+                        <div class="action-footer">
+                            <button class="primary-btn btn-next" id="btn-next-1">Continue to Message <svg width="18"
+                                    height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    <polyline points="12 5 19 12 12 19"></polyline>
+                                </svg></button>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Compose Message -->
+                    <div id="step-2-content" class="step-content">
+                        <div class="message-composer-wrapper">
+                            <div class="composer-main">
+                                <div class="input-group">
+                                    <label>WhatsApp Message Template</label>
+                                    <p class="help-text">Use variables to personalize each message based on your data.
+                                    </p>
+                                    <textarea id="message-body">Hi there,
+
+I hope you're doing well.
+
+I am a Full Stack Developer with over 4 years of experience building scalable web applications using NestJS, React, TypeScript, and MongoDB. I specialize in designing secure REST and GraphQL APIs, implementing JWT authentication and RBAC, and optimizing backend performance using clean architecture principles.
+
+I containerize applications using Docker and implement CI/CD pipelines with GitHub Actions to automate testing and deployment workflows. I am currently seeking a Full Stack Developer opportunity and would welcome the chance to contribute to {{name}}. I have attached my CV for your review and would love to discuss how my skill set aligns with your team's goals.
+
+Portfolio: https://tahirdev.vercel.app
+LinkedIn: https://www.linkedin.com/in/muhammadtahirsultan
+GitHub: https://github.com/muhammad-tahir-sultan
+Phone: +92 326 6640988
+
+Best regards,
+Muhammad Tahir
+Full Stack Developer</textarea>
+                                </div>
+                                <div class="variables-panel">
+                                    <p>Available Variables (Click to insert):</p>
+                                    <div class="variable-chips" id="variable-chips-container">
+                                        <div class="chip" data-var="{{name}}">{{name}}</div>
+                                        <div class="chip" data-var="{{website}}">{{website}}</div>
+                                        <div class="chip" data-var="{{phone}}">{{phone}}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="composer-attachment">
+                                <h3>Attachment (Optional)</h3>
+                                <div class="attachment-upload" id="attachment-dropzone">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path
+                                            d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48">
+                                        </path>
+                                    </svg>
+                                    <span>Attach PDF / Image / Video</span>
+                                    <input type="file" id="attachment-input" accept=".pdf, image/*, video/*"
+                                        style="display: none;">
+                                </div>
+                                <div id="attachment-preview" class="attachment-preview" style="display: none;">
+                                    <div class="file-info">
+                                        <span class="file-icon">📄</span>
+                                        <span id="attached-filename" class="file-name">my_cv.pdf</span>
+                                    </div>
+                                    <button id="remove-attachment-btn" class="icon-btn danger">&times;</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="action-footer split">
+                            <button class="nav-btn-secondary btn-prev" id="btn-prev-2">Back</button>
+                            <button class="primary-btn btn-next" id="btn-next-2">Configure Settings <svg width="18"
+                                    height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    <polyline points="12 5 19 12 12 19"></polyline>
+                                </svg></button>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: Settings -->
+                    <div id="step-3-content" class="step-content">
+                        <div class="settings-grid">
+                            <div class="setting-card">
+                                <h3>Delay Between Messages</h3>
+                                <p>To prevent WhatsApp from banning your number, it is highly recommended to add a delay
+                                    between each sent message.</p>
+                                <div class="delay-slider-wrapper">
+                                    <input type="range" id="delay-slider" min="3" max="60" value="10">
+                                    <div class="slider-value"><span id="delay-value">10</span> sec</div>
+                                </div>
+                                <div class="checkbox-group mt-3">
+                                    <input type="checkbox" id="randomize-delay" checked>
+                                    <label for="randomize-delay"
+                                        style="display: inline; text-transform:none; margin-left: 8px;">Randomize delay
+                                        (+/- 3 seconds)</label>
+                                </div>
+                            </div>
+
+                            <div class="setting-card">
+                                <h3>Advanced Safety Settings</h3>
+                                <div class="checkbox-group">
+                                    <input type="checkbox" id="pause-batch" checked>
+                                    <label for="pause-batch">Pause for 2 minutes after every</label>
+                                    <input type="number" id="batch-size" value="20"
+                                        style="width: 60px; padding: 4px; display: inline-block; margin: 0 5px;" min="5"
+                                        max="100">
+                                    <label>messages.</label>
+                                </div>
+
+                                <div class="info-box mt-3">
+                                    <strong><span style="color:#f59e0b;">⚠️</span> Best Practices</strong><br>
+                                    Do not blast from your primary business number immediately. Send to contacts who
+                                    expect messages. LeadGen Maps is an automation tool, but Meta's anti-spam policies
+                                    still apply to your WhatsApp account.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="action-footer split">
+                            <button class="nav-btn-secondary btn-prev" id="btn-prev-3">Back</button>
+                            <button class="primary-btn btn-next" id="btn-next-3">Review & Launch <svg width="18"
+                                    height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    <polyline points="12 5 19 12 12 19"></polyline>
+                                </svg></button>
+                        </div>
+                    </div>
+
+                    <!-- Step 4: Dashboard -->
+                    <div id="step-4-content" class="step-content">
+                        <div class="launch-dashboard">
+                            <div class="campaign-summary">
+                                <div class="stat-box">
+                                    <span class="stat-label">Total Contacts</span>
+                                    <span class="stat-value text-primary" id="final-contact-count">0</span>
+                                </div>
+                                <div class="stat-box">
+                                    <span class="stat-label">Valid Phone Numbers</span>
+                                    <span class="stat-value text-accent" id="final-valid-count">0</span>
+                                </div>
+                                <div class="stat-box">
+                                    <span class="stat-label">Est. Time</span>
+                                    <span class="stat-value" id="final-est-time">0 min</span>
+                                </div>
+                            </div>
+
+                            <button id="launch-campaign-btn" class="whatsapp-btn massive">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <polygon points="10 8 16 12 10 16 10 8"></polygon>
+                                </svg>
+                                START BLASTING
+                            </button>
+                            <p class="text-center help-text mt-3" style="max-width: 400px; margin: 12px auto;">This will
+                                open WhatsApp Web in a new tab and begin sending automatically. Please do not close this
+                                window during the process.</p>
+
+                            <!-- Real-time Status Area (Hidden until launched) -->
+                            <div id="live-progress-area" style="display: none; margin-top: 30px;">
+                                <div class="progress-header">
+                                    <h3>Campaign Progress</h3>
+                                    <span id="progress-percent">0%</span>
+                                </div>
+                                <div class="progress-bar-bg massive-bar">
+                                    <div id="campaign-progress-fill" class="progress-bar-fill emerald"></div>
+                                </div>
+                                <div class="log-console" id="campaign-logs">
+                                    <div class="log-entry sys">System ready. Waiting for Launch...</div>
+                                </div>
+                                <button id="stop-campaign-btn" class="danger-btn"
+                                    style="width: 100%; margin-top: 15px;">STOP CAMPAIGN</button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </main>
+    </div>
+    <script src="whatsapp.js"></script>
+</body>
+
+</html>

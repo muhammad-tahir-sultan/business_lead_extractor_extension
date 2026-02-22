@@ -745,7 +745,13 @@ function updateUI(state) {
     document.getElementById('append-sheet-btn').disabled = !hasData;
     document.getElementById('new-sheet-btn').disabled = !hasData;
     document.getElementById('clear-results-btn').disabled = !hasData;
+    document.getElementById('whatsapp-blast-btn').disabled = !hasData;
 }
+
+document.getElementById('whatsapp-blast-btn').addEventListener('click', () => {
+    // Open the full-page WhatsApp module in a new tab
+    chrome.tabs.create({ url: chrome.runtime.getURL('whatsapp.html') });
+});
 
 document.getElementById('start-btn').addEventListener('click', async () => {
     const keywordInput = document.getElementById('keyword');

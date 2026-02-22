@@ -144,4 +144,78 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'get_status') {
         sendResponse(scrapingState);
     }
+
+    if (request.action === 'send_whatsapp_message') {
+        handleWhatsAppMessage(request.phone, request.text, request.file, request.mime, request.filename)
+            .then(result => sendResponse(result))
+            .catch(err => sendResponse({ success: false, error: err.toString() }));
+        return true; // Keep message channel open for async response
+    }
 });
+
+// WhatsApp Blast Logic
+let waTabId = null;
+
+async function handleWhatsAppMessage(phone, text, fileBase64, mimeType, filename) {
+    const waUrl = `https://web.whatsapp.com/send?phone=${encodeURIComponent(phone)}&text=${encodeURIComponent(text)}`;
+
+    // Check if we already have a WA tab open
+    if (waTabId) {
+        try {
+            await chrome.tabs.update(waTabId, { url: waUrl, active: true });
+        } catch (e) {
+            // Tab was closed, create new
+            const newTab = await chrome.tabs.create({ url: waUrl, active: true });
+            waTabId = newTab.id;
+        }
+    } else {
+        const newTab = await chrome.tabs.create({ url: waUrl, active: true });
+        waTabId = newTab.id;
+    }
+
+    // Wait for WA to load and execute the automation script
+    return new Promise((resolve, reject) => {
+        let listener = function (tabId, changeInfo, tab) {
+            if (tabId === waTabId && changeInfo.status === 'complete') {
+                chrome.tabs.onUpdated.removeListener(listener);
+
+                // Inject the content script to perform the click
+                chrome.scripting.executeScript({
+                    target: { tabId: waTabId },
+                    files: ['whatsapp_content.js']
+                }, () => {
+                    if (chrome.runtime.lastError) {
+                        return reject(chrome.runtime.lastError.message);
+                    }
+
+                    // Send the data block to the content script
+                    chrome.tabs.sendMessage(waTabId, {
+                        action: 'run_wa_automation',
+                        hasFile: !!fileBase64,
+                        file: fileBase64,
+                        mime: mimeType,
+                        filename: filename
+                    }, (response) => {
+                        if (chrome.runtime.lastError || !response) {
+                            // Can fail if script wasn't ready
+                            setTimeout(() => {
+                                chrome.tabs.sendMessage(waTabId, {
+                                    action: 'run_wa_automation',
+                                    hasFile: !!fileBase64,
+                                    file: fileBase64,
+                                    mime: mimeType,
+                                    filename: filename
+                                }, (retryResp) => {
+                                    resolve(retryResp || { success: false, error: "No response from tab." });
+                                });
+                            }, 5000);
+                        } else {
+                            resolve(response);
+                        }
+                    });
+                });
+            }
+        };
+        chrome.tabs.onUpdated.addListener(listener);
+    });
+}
