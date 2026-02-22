@@ -175,8 +175,22 @@ async function handleWhatsAppMessage(phone, text, fileBase64, mimeType, filename
 
     // Wait for WA to load and execute the automation script
     return new Promise((resolve, reject) => {
+        let isResolved = false;
+
+        // Fallback timeout in case the event listener misses the payload
+        let timeoutId = setTimeout(() => {
+            if (!isResolved) {
+                isResolved = true;
+                chrome.tabs.onUpdated.removeListener(listener);
+                reject("Timeout waiting for WhatsApp tab to load.");
+            }
+        }, 45000);
+
         let listener = function (tabId, changeInfo, tab) {
             if (tabId === waTabId && changeInfo.status === 'complete') {
+                if (isResolved) return;
+                isResolved = true;
+                clearTimeout(timeoutId);
                 chrome.tabs.onUpdated.removeListener(listener);
 
                 // Inject the content script to perform the click
@@ -188,31 +202,34 @@ async function handleWhatsAppMessage(phone, text, fileBase64, mimeType, filename
                         return reject(chrome.runtime.lastError.message);
                     }
 
-                    // Send the data block to the content script
-                    chrome.tabs.sendMessage(waTabId, {
-                        action: 'run_wa_automation',
-                        hasFile: !!fileBase64,
-                        file: fileBase64,
-                        mime: mimeType,
-                        filename: filename
-                    }, (response) => {
-                        if (chrome.runtime.lastError || !response) {
-                            // Can fail if script wasn't ready
-                            setTimeout(() => {
-                                chrome.tabs.sendMessage(waTabId, {
-                                    action: 'run_wa_automation',
-                                    hasFile: !!fileBase64,
-                                    file: fileBase64,
-                                    mime: mimeType,
-                                    filename: filename
-                                }, (retryResp) => {
-                                    resolve(retryResp || { success: false, error: "No response from tab." });
-                                });
-                            }, 5000);
-                        } else {
-                            resolve(response);
-                        }
-                    });
+                    // Wait a moment for the script to initialize its listener
+                    setTimeout(() => {
+                        // Send the data block to the content script
+                        chrome.tabs.sendMessage(waTabId, {
+                            action: 'run_wa_automation',
+                            hasFile: !!fileBase64,
+                            file: fileBase64,
+                            mime: mimeType,
+                            filename: filename
+                        }, (response) => {
+                            if (chrome.runtime.lastError || !response) {
+                                // Can fail if script wasn't ready
+                                setTimeout(() => {
+                                    chrome.tabs.sendMessage(waTabId, {
+                                        action: 'run_wa_automation',
+                                        hasFile: !!fileBase64,
+                                        file: fileBase64,
+                                        mime: mimeType,
+                                        filename: filename
+                                    }, (retryResp) => {
+                                        resolve(retryResp || { success: false, error: "No response from tab." });
+                                    });
+                                }, 5000);
+                            } else {
+                                resolve(response);
+                            }
+                        });
+                    }, 3000); // 3 seconds delay
                 });
             }
         };

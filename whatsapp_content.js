@@ -8,10 +8,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 async function runAutomation(data) {
-    // 1. Wait for WhatsApp to fully load the chat
-    await waitForElement('div[title="Type a message"], div[title="Escribe un mensaje"], footer', 30000);
+    // 1. Wait for WhatsApp to fully load the chat OR show an error popup
+    try {
+        await waitForElement('div[title="Type a message"], div[title="Escribe un mensaje"], footer, div[data-animate-modal-popup="true"]', 30000);
+    } catch (err) {
+        throw new Error("Timeout waiting for WhatsApp Chat to load.");
+    }
 
     // Wait an extra second for React to settle
+    await sleep(2000);
+
+    // 1.5 Handle "Invalid Phone Number" modal if it appeared
+    const errorModal = document.querySelector('div[data-animate-modal-popup="true"]');
+    if (errorModal) {
+        const text = errorModal.innerText.toLowerCase();
+        if (text.includes("invalid") || text.includes("phone number shared") || text.includes("no válido")) {
+            // Find and click the 'OK' button to dismiss the modal so the next number can load cleanly
+            const okBtn = errorModal.querySelector('button');
+            if (okBtn) okBtn.click();
+
+            throw new Error("Contact not on WhatsApp (Invalid Number)");
+        }
+    }
     await sleep(2000);
 
     // 2. Check if a pre-filled text needs to be sent
