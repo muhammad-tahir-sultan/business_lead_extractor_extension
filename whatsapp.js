@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let validContacts = [];
     let isCampaignRunning = false;
     let shouldStopCampaign = false;
+    let campaignStartIndex = 0;   // tracks where to resume from
     let attachmentBase64 = null;
     let attachmentMimeType = null;
     let attachmentName = null;
@@ -271,25 +272,79 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('final-est-time').innerText = Math.round(avgTotalSecs / 60) + ' min';
     }
 
+    // Helper: manage button visibility based on campaign state
+    function showCampaignState(state) {
+        const launchBtn = document.getElementById('launch-campaign-btn');
+        const stopBtn = document.getElementById('stop-campaign-btn');
+        const resumeBtn = document.getElementById('resume-campaign-btn');
+        const restartBtn = document.getElementById('restart-campaign-btn');
+        const progressArea = document.getElementById('live-progress-area');
+
+        if (state === 'idle') {
+            launchBtn.style.display = 'block';
+            progressArea.style.display = 'none';
+            stopBtn.style.display = 'none';
+            resumeBtn.style.display = 'none';
+            restartBtn.style.display = 'none';
+        } else if (state === 'running') {
+            launchBtn.style.display = 'none';
+            progressArea.style.display = 'block';
+            stopBtn.style.display = 'flex';
+            resumeBtn.style.display = 'none';
+            restartBtn.style.display = 'none';
+        } else if (state === 'stopped') {
+            launchBtn.style.display = 'none';
+            progressArea.style.display = 'block';
+            stopBtn.style.display = 'none';
+            resumeBtn.style.display = 'flex';
+            restartBtn.style.display = 'flex';
+        } else if (state === 'complete') {
+            launchBtn.style.display = 'none';
+            progressArea.style.display = 'block';
+            stopBtn.style.display = 'none';
+            resumeBtn.style.display = 'none';
+            restartBtn.style.display = 'flex';
+        }
+    }
+
     document.getElementById('launch-campaign-btn').addEventListener('click', () => {
         if (!msgBox.value.trim() && !attachmentBase64) {
             alert("Please provide a message or an attachment to send.");
             goToStep(2);
             return;
         }
-
-        startCampaign();
+        campaignStartIndex = 0;
+        startCampaign(0);
     });
 
     document.getElementById('stop-campaign-btn').addEventListener('click', () => {
         shouldStopCampaign = true;
-        logMsg("Requested campaign stop. Finishing current message...", "error");
+        logMsg("⏹ Stop requested — finishing current message then halting...", "error");
     });
 
-    async function startCampaign() {
-        document.getElementById('launch-campaign-btn').style.display = 'none';
-        document.getElementById('live-progress-area').style.display = 'block';
+    document.getElementById('resume-campaign-btn').addEventListener('click', () => {
+        if (!msgBox.value.trim() && !attachmentBase64) {
+            alert("Please provide a message or an attachment to send.");
+            return;
+        }
+        logMsg(`▶ Resuming from contact ${campaignStartIndex + 1} of ${validContacts.length}...`, "sys");
+        startCampaign(campaignStartIndex);
+    });
 
+    document.getElementById('restart-campaign-btn').addEventListener('click', () => {
+        if (!msgBox.value.trim() && !attachmentBase64) {
+            alert("Please provide a message or an attachment to send.");
+            return;
+        }
+        // Clear logs and progress bar
+        document.getElementById('campaign-logs').innerHTML = '<div class="log-entry sys">Restarting campaign from the beginning...</div>';
+        document.getElementById('campaign-progress-fill').style.width = '0%';
+        document.getElementById('progress-percent').innerText = '0%';
+        startCampaign(0);
+    });
+
+    async function startCampaign(fromIndex) {
+        showCampaignState('running');
         isCampaignRunning = true;
         shouldStopCampaign = false;
 
@@ -299,11 +354,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const pauseBatch = document.getElementById('pause-batch').checked;
         const batchSize = parseInt(document.getElementById('batch-size').value);
 
-        logMsg(`Starting campaign to ${validContacts.length} numbers...`, "sys");
+        if (fromIndex === 0) {
+            logMsg(`🚀 Starting campaign to ${validContacts.length} contacts...`, "sys");
+        }
 
-        for (let i = 0; i < validContacts.length; i++) {
+        for (let i = fromIndex; i < validContacts.length; i++) {
+            // Save index so Resume knows where to pick up
+            campaignStartIndex = i;
+
             if (shouldStopCampaign) {
-                logMsg("Campaign stopped by user.", "error");
+                logMsg(`⏹ Campaign stopped at contact ${i + 1} of ${validContacts.length}.`, "error");
                 break;
             }
 
@@ -319,21 +379,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
 
-            logMsg(`[${i + 1}/${validContacts.length}] Preparing message for ${phone}...`, "info");
+            logMsg(`[${i + 1}/${validContacts.length}] Preparing for ${phone}...`, "info");
 
-            // Send trigger to background to open WA Web tab and inject script
             try {
                 const response = await sendWhatsAppMessage(phone, msg, attachmentBase64, attachmentMimeType, attachmentName);
                 if (response.success) {
-                    logMsg(`Successfully sent to ${phone}`, "success");
+                    logMsg(`✅ Sent to ${phone}`, "success");
                 } else {
-                    logMsg(`Failed to send to ${phone}: ${response.error}`, "error");
+                    logMsg(`❌ Failed for ${phone}: ${response.error}`, "error");
                 }
             } catch (err) {
-                logMsg(`Error communicating with automator for ${phone}`, "error");
+                logMsg(`⚠️ Error for ${phone}: ${err}`, "error");
             }
 
-            // Update progress
+            // Update progress bar
             const perc = Math.round(((i + 1) / validContacts.length) * 100);
             document.getElementById('progress-percent').innerText = `${perc}%`;
             document.getElementById('campaign-progress-fill').style.width = `${perc}%`;
@@ -341,24 +400,28 @@ document.addEventListener('DOMContentLoaded', () => {
             if (i < validContacts.length - 1 && !shouldStopCampaign) {
                 let waitSecs = delayBase;
                 if (randDelay) {
-                    waitSecs += Math.floor(Math.random() * 7) - 3; // base +/- 3
+                    waitSecs += Math.floor(Math.random() * 7) - 3;
                     if (waitSecs < 1) waitSecs = 1;
                 }
-
                 if (pauseBatch && (i + 1) % batchSize === 0) {
-                    logMsg("Batch limit reached. Pausing for 2 minutes to prevent ban...", "sys");
+                    logMsg(`⏳ Batch pause — waiting 2 minutes to prevent ban...`, "sys");
                     waitSecs += 120;
                 }
-
-                logMsg(`Waiting ${waitSecs} seconds...`, "info");
+                logMsg(`💤 Waiting ${waitSecs}s before next contact...`, "info");
                 await sleep(waitSecs * 1000);
             }
         }
 
         isCampaignRunning = false;
-        if (!shouldStopCampaign) {
-            logMsg("Campaign Complete 🎉", "success");
-            document.getElementById('stop-campaign-btn').style.display = 'none';
+
+        if (shouldStopCampaign) {
+            // Show Resume + Restart after stop
+            showCampaignState('stopped');
+        } else {
+            // All done
+            logMsg("🎉 Campaign Complete! All contacts processed.", "success");
+            campaignStartIndex = 0;
+            showCampaignState('complete');
         }
     }
 

@@ -301,8 +301,22 @@ Full Stack Developer</textarea>
                                 <div class="log-console" id="campaign-logs">
                                     <div class="log-entry sys">System ready. Waiting for Launch...</div>
                                 </div>
-                                <button id="stop-campaign-btn" class="danger-btn"
-                                    style="width: 100%; margin-top: 15px;">STOP CAMPAIGN</button>
+
+                                <!-- Campaign Control Buttons -->
+                                <div id="campaign-controls" style="display: flex; gap: 10px; margin-top: 15px;">
+                                    <!-- Shown while running -->
+                                    <button id="stop-campaign-btn" class="danger-btn" style="flex: 1;">
+                                        ⏹ STOP CAMPAIGN
+                                    </button>
+
+                                    <!-- Shown after stopped -->
+                                    <button id="resume-campaign-btn" class="primary-btn" style="flex: 1; display: none;">
+                                        ▶ RESUME FROM HERE
+                                    </button>
+                                    <button id="restart-campaign-btn" class="nav-btn-secondary" style="flex: 1; display: none;">
+                                        🔄 RESTART FROM BEGINNING
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>

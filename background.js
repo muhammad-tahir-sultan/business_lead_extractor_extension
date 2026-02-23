@@ -249,45 +249,123 @@ async function waAutomationRunner(data) {
         return new Blob(arr, { type: mime });
     }
 
+    // Correct WA icon names (WhatsApp updated from 'send' to 'wds-ic-send-filled')
+    const SEND_ICON_SEL = 'span[data-icon="wds-ic-send-filled"], span[data-icon="send"]';
+
+    // Robust send button finder — 4 strategies to find the green send button
+    function findSendButton() {
+        // Strategy 1: By aria-label in multiple languages
+        const ariaLabels = ['Send', 'Enviar', '\u0625\u0631\u0633\u0627\u0644', 'Envoyer', 'Senden', 'Invia', '\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c'];
+        for (const label of ariaLabels) {
+            const btn = document.querySelector('button[aria-label="' + label + '"]');
+            if (btn) return btn;
+        }
+
+        // Strategy 2: Find the send icon inside footer, walk up DOM to the button
+        const footer = document.querySelector('footer');
+        if (footer) {
+            const sendIcon = footer.querySelector(SEND_ICON_SEL);
+            if (sendIcon) {
+                let el = sendIcon;
+                for (let i = 0; i < 6; i++) {
+                    el = el.parentElement;
+                    if (!el) break;
+                    if (el.tagName === 'BUTTON' || el.getAttribute('role') === 'button') return el;
+                }
+                return sendIcon;
+            }
+            // Any button in footer containing a send icon
+            const footerBtns = footer.querySelectorAll('button');
+            for (const b of footerBtns) {
+                if (b.querySelector(SEND_ICON_SEL)) return b;
+            }
+        }
+
+        // Strategy 3: Global send icon fallback — walk up DOM
+        const iconGlobal = document.querySelector(SEND_ICON_SEL);
+        if (iconGlobal) {
+            let el = iconGlobal;
+            for (let i = 0; i < 6; i++) {
+                el = el.parentElement;
+                if (!el) break;
+                if (el.tagName === 'BUTTON' || el.getAttribute('role') === 'button') return el;
+            }
+            return iconGlobal;
+        }
+
+        return null;
+    }
+
     try {
         // Step 1: Wait for chat box OR invalid number modal
         await waitForEl(
             'footer, div[data-animate-modal-popup="true"], div[title="Type a message"]',
             30000
         );
-        await sleep(1500);
+        await sleep(2000);
 
         // Step 1.5: Check for invalid number modal
         const modal = document.querySelector('div[data-animate-modal-popup="true"]');
         if (modal) {
             const txt = modal.innerText.toLowerCase();
-            if (txt.includes('invalid') || txt.includes('phone number shared') || txt.includes('no válido')) {
+            if (txt.includes('invalid') || txt.includes('phone number shared') || txt.includes('no v\u00e1lido')) {
                 const btn = modal.querySelector('button');
                 if (btn) btn.click();
                 return { success: false, error: 'Contact not on WhatsApp (Invalid Number)' };
             }
         }
 
-        // Step 2: Send text message
-        const sendBtnSel = 'button[aria-label="Send"], button[aria-label="Enviar"], span[data-icon="send"]';
-        let sendBtn = document.querySelector(sendBtnSel);
+        // Step 2: Focus and nudge the chatbox so WhatsApp activates the send button
+        // (When text is pre-filled via URL params, WA needs a focus event to enable send)
+        const chatBoxSelectors = [
+            'div[contenteditable="true"][data-tab="10"]',
+            'div[contenteditable="true"][title="Type a message"]',
+            'div[contenteditable="true"][title="Escribe un mensaje"]',
+            'div[contenteditable="true"]'
+        ];
+        let chatBox = null;
+        for (const sel of chatBoxSelectors) {
+            chatBox = document.querySelector(sel);
+            if (chatBox) break;
+        }
 
-        if (!sendBtn) {
-            const chatBox = document.querySelector('div[contenteditable="true"][data-tab="10"]');
+        if (chatBox) {
+            chatBox.click();
+            chatBox.focus();
+            chatBox.dispatchEvent(new Event('focus', { bubbles: true }));
+            chatBox.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'End', keyCode: 35 }));
+            chatBox.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'End', keyCode: 35 }));
+            chatBox.dispatchEvent(new InputEvent('input', { bubbles: true }));
+            await sleep(1000);
+        }
+
+        // Step 3: Find and click the send button with up to 6 retries
+        let sendBtn = null;
+        for (let attempt = 0; attempt < 6; attempt++) {
+            sendBtn = findSendButton();
+            if (sendBtn) break;
             if (chatBox) {
-                chatBox.focus();
-                document.execCommand('insertText', false, ' ');
-                await sleep(500);
+                chatBox.dispatchEvent(new InputEvent('input', { bubbles: true }));
+                chatBox.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: ' ', keyCode: 32 }));
+                chatBox.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: ' ', keyCode: 32 }));
             }
-            sendBtn = document.querySelector(sendBtnSel);
+            await sleep(700);
         }
 
         if (sendBtn) {
-            (sendBtn.closest('button') || sendBtn).click();
-            await sleep(1500);
+            sendBtn.click();
+            await sleep(2000);
+        } else if (chatBox) {
+            // Last resort: simulate pressing Enter to send the message
+            chatBox.focus();
+            chatBox.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter', keyCode: 13, which: 13 }));
+            chatBox.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, cancelable: true, key: 'Enter', keyCode: 13, which: 13 }));
+            await sleep(2000);
+        } else {
+            return { success: false, error: 'Could not find send button or chat box' };
         }
 
-        // Step 3: Attach file if provided
+        // Step 4: Attach file if provided
         if (data.hasFile && data.file) {
             const blob = base64ToBlob(data.file.split(',')[1], data.mime);
             const file = new File([blob], data.filename || 'attachment', { type: data.mime });
@@ -301,10 +379,10 @@ async function waAutomationRunner(data) {
             drop.dispatchEvent(new DragEvent('drop', evOpts));
 
             await sleep(2000);
-            await waitForEl('span[data-icon="send"]', 10000);
-
-            const mediaSend = document.querySelector('span[data-icon="send"]');
-            if (mediaSend) (mediaSend.closest('button') || mediaSend.closest('div[role="button"]') || mediaSend).click();
+            await waitForEl(SEND_ICON_SEL, 10000);
+            await sleep(500);
+            const mediaSend = findSendButton();
+            if (mediaSend) mediaSend.click();
         }
 
         await sleep(1500);
