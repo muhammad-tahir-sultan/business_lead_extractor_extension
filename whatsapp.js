@@ -237,6 +237,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(url);
             const csvText = await response.text();
 
+            // Safety Check: If we got HTML back, it means the sheet is private/protected
+            if (csvText.includes('<html') || csvText.includes('<!DOCTYPE') || csvText.includes('widget-bootstrap')) {
+                leadsBadge.innerText = 'Private Sheet (Error)';
+                alert("This Google Sheet appears to be PRIVATE. \n\nPlease click 'Share' in Google Sheets and set access to 'Anyone with the link can view'.");
+                return;
+            }
+
             leadsData = parseCSV(csvText);
             leadsBadge.innerText = `${leadsData.length} Leads Ready (Google Sheets)`;
             leadsBadge.style.color = '#34d399';
@@ -332,7 +339,8 @@ document.addEventListener('DOMContentLoaded', () => {
         validContacts = Array.from(phoneMap.values());
 
         if (validContacts.length === 0) {
-            alert("No valid phone numbers found in the dataset. Please ensure there is a 'phone' or 'contact' column.");
+            const sampleHeaders = leadsData.length > 0 ? Object.keys(leadsData[0]).join(', ') : 'None';
+            alert(`No valid phone numbers found!\n\nDetected columns: ${sampleHeaders}\n\nPlease make sure one of your columns is named 'phone', 'mobile', or 'contact' and contains digits.`);
             return;
         }
 
