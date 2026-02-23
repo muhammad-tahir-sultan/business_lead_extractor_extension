@@ -335,24 +335,45 @@ async function waAutomationRunner(data) {
         await sleep(300);
     }
 
-    try {
-        // STEP 1: Wait for the chat interface to appear
-        // Wait for footer (chat loaded) OR invalid number modal
-        await waitForEl(
-            'footer, div[data-animate-modal-popup="true"]',
-            35000
-        );
-        await sleep(2000);
-
-        // STEP 2: Check for invalid number modal
+    // Checks if the current visible modal is a "not on WhatsApp" error modal.
+    // Returns the dismiss button if found, null otherwise.
+    function getInvalidNumberModal() {
         const modal = document.querySelector('div[data-animate-modal-popup="true"]');
-        if (modal) {
-            const txt = modal.innerText.toLowerCase();
-            if (txt.includes('invalid') || txt.includes('phone number shared') || txt.includes('no v\u00e1lido') || txt.includes('not on whatsapp')) {
-                const btn = modal.querySelector('button');
-                if (btn) btn.click();
-                return { success: false, error: 'Contact not on WhatsApp (Invalid Number)' };
-            }
+        if (!modal) return null;
+        const txt = modal.innerText.toLowerCase();
+        const isInvalid =
+            txt.includes("isn't on whatsapp") ||
+            txt.includes("is not on whatsapp") ||
+            txt.includes('not on whatsapp') ||
+            txt.includes('invalid') ||
+            txt.includes('phone number shared') ||
+            txt.includes('no v\u00e1lido') ||
+            txt.includes('no está en whatsapp');
+        if (!isInvalid) return null;
+        return modal.querySelector('button') || modal; // return dismiss btn
+    }
+
+    try {
+        // STEP 1: Wait for chat footer OR invalid number modal — whichever comes first
+        // We poll every 500ms so we can skip invalid numbers instantly instead of waiting
+        await (function waitForChatOrModal(ms) {
+            return new Promise((resolve, reject) => {
+                const check = () => {
+                    if (document.querySelector('footer')) return resolve();
+                    if (getInvalidNumberModal()) return resolve();
+                };
+                check(); // immediate check first
+                const obs = new MutationObserver(check);
+                obs.observe(document.body, { childList: true, subtree: true });
+                setTimeout(() => { obs.disconnect(); resolve(); }, ms); // resolve after timeout anyway
+            });
+        })(35000);
+
+        // STEP 2: Immediately check for invalid number modal — NO sleep, skip right away
+        const dismissBtn = getInvalidNumberModal();
+        if (dismissBtn) {
+            dismissBtn.click(); // dismiss the OK modal
+            return { success: false, error: "Number isn't on WhatsApp — skipped" };
         }
 
         // STEP 3: Find the chatbox using multiple selectors
