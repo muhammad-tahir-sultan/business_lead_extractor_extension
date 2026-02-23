@@ -64,6 +64,26 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-next-2').addEventListener('click', () => goToStep(3));
     document.getElementById('btn-prev-3').addEventListener('click', () => goToStep(2));
     document.getElementById('btn-next-3').addEventListener('click', () => goToStep(4));
+    document.getElementById('go-back-from-4').addEventListener('click', () => goToStep(3));
+
+    // Allow clicking the sidebar steps directly to navigate backwards or forwards
+    navItems.forEach((item, index) => {
+        item.style.cursor = 'pointer';
+        item.addEventListener('click', () => {
+            // Optional: Only allow clicking steps they've technically unlocked
+            // But since this is a local tool, free navigation is fine. 
+            // We just shouldn't let them launch if validContacts is empty.
+            if (index === 3 && validContacts.length === 0 && leadsData.length > 0) {
+                // If they try to skip straight to step 4 without processing step 1, force process
+                processDataAndGoNext();
+                setTimeout(() => goToStep(4), 100);
+            } else if (index === 1 && validContacts.length === 0 && leadsData.length > 0) {
+                processDataAndGoNext();
+            } else {
+                goToStep(index + 1);
+            }
+        });
+    });
 
     // --- STEP 1: Data Source Logic ---
     const sourceCards = document.querySelectorAll('.source-card');
