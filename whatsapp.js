@@ -146,19 +146,148 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.readAsText(file);
     });
 
+    // --- Google Sheets Logic ---
+    const sheetUrlInput = document.getElementById('sheet-url-input');
+    const sheetSelectionContainer = document.getElementById('sheet-selection-container');
+    const sheetSelect = document.getElementById('sheet-select');
+    let currentSpreadsheetId = null;
+
+    sheetUrlInput.addEventListener('input', async (e) => {
+        const url = e.target.value.trim();
+        if (!url) {
+            sheetSelectionContainer.style.display = 'none';
+            leadsData = [];
+            leadsBadge.innerText = '0 Leads Ready';
+            return;
+        }
+
+        const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+        if (match) {
+            const spreadsheetId = match[1];
+            // Extract gid from URL if present (e.g., ...edit?gid=12345)
+            const gidMatch = url.match(/[?&]gid=(\d+)/);
+            const initialGid = gidMatch ? gidMatch[1] : null;
+
+            if (spreadsheetId !== currentSpreadsheetId) {
+                currentSpreadsheetId = spreadsheetId;
+                fetchSheetList(spreadsheetId, initialGid);
+            }
+        }
+    });
+
+    async function fetchSheetList(id, preferredGid = null) {
+        sheetSelectionContainer.style.display = 'block';
+        sheetSelect.innerHTML = '<option value="">-- Loading Sheets... --</option>';
+
+        try {
+            const mainRes = await fetch(`https://docs.google.com/spreadsheets/d/${id}/edit`);
+            const html = await mainRes.text();
+
+            const sheets = [];
+            // Robust parsing for sheet metadata in the HTML
+            // Google Sheets embeds metadata in a few JSON blobs
+            const patterns = [
+                /{"sheetId":(\d+),"sheetName":"([^"]+)"/g,
+                /\[(\d+),"([^"]+)",\d+,\d+\]/g, // Older format
+                /gid=(\d+)[^>]*>([^<]+)<\/a>/g // Link format
+            ];
+
+            for (const pat of patterns) {
+                let m;
+                while ((m = pat.exec(html)) !== null) {
+                    const id = m[1];
+                    const name = m[2];
+                    if (name && name.length < 100 && !sheets.find(s => s.id === id)) {
+                        sheets.push({ id, name });
+                    }
+                }
+            }
+
+            if (sheets.length > 0) {
+                sheetSelect.innerHTML = '<option value="">-- Select a Sheet --</option>' +
+                    sheets.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+
+                // Use preferred GID from URL, or the first sheet in the list
+                const targetGid = preferredGid || sheets[0].id;
+                sheetSelect.value = targetGid;
+                loadSheetData(id, targetGid);
+            } else {
+                // Absolute fallback
+                const fallbackGid = preferredGid || "0";
+                sheetSelect.innerHTML = `<option value="${fallbackGid}">Default Sheet</option>`;
+                loadSheetData(id, fallbackGid);
+            }
+        } catch (err) {
+            console.error("Error fetching sheets:", err);
+            sheetSelect.innerHTML = '<option value="">Error loading sheets. Check sharing settings.</option>';
+        }
+    }
+
+    sheetSelect.addEventListener('change', () => {
+        const gid = sheetSelect.value;
+        if (gid && currentSpreadsheetId) {
+            loadSheetData(currentSpreadsheetId, gid);
+        }
+    });
+
+    async function loadSheetData(spreadsheetId, gid) {
+        leadsBadge.innerText = 'Loading Data...';
+        try {
+            const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&gid=${gid}`;
+            const response = await fetch(url);
+            const csvText = await response.text();
+
+            leadsData = parseCSV(csvText);
+            leadsBadge.innerText = `${leadsData.length} Leads Ready (Google Sheets)`;
+            leadsBadge.style.color = '#34d399';
+            leadsBadge.style.backgroundColor = 'rgba(52, 211, 153, 0.15)';
+        } catch (err) {
+            console.error("Error loading sheet data:", err);
+            leadsBadge.innerText = 'Error loading data';
+            leadsBadge.style.color = '#f87171';
+            alert("Could not load data. Ensure sheet is 'Anyone with the link can view'.");
+        }
+    }
+
     function parseCSV(str) {
-        const rows = str.split('\n');
+        const rows = str.split(/\r?\n/);
         if (rows.length < 2) return [];
-        const headers = rows[0].split(',').map(h => h.replace(/"/g, '').trim());
+
+        const parseRow = (row) => {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+            for (let i = 0; i < row.length; i++) {
+                const char = row[i];
+                if (char === '"') {
+                    if (inQuotes && row[i + 1] === '"') { // Handle escaped quotes
+                        current += '"';
+                        i++;
+                    } else {
+                        inQuotes = !inQuotes;
+                    }
+                } else if (char === ',' && !inQuotes) {
+                    result.push(current.trim());
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            result.push(current.trim());
+            return result.map(v => v.replace(/^"|"$/g, '').trim());
+        };
+
+        const headers = parseRow(rows[0]);
         const data = [];
         for (let i = 1; i < rows.length; i++) {
             if (!rows[i].trim()) continue;
-            // Basic CSV parse (does not handle commas inside quotes perfectly, using simple split for demo)
-            // A realistic implementation would use regex or a library.
-            const values = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+            const values = parseRow(rows[i]);
+            if (values.length < headers.length) continue;
             const obj = {};
             headers.forEach((h, index) => {
-                obj[h] = values[index] ? values[index].replace(/^"|"$/g, '').trim() : '';
+                // Normalize key: lowercase, trim, and remove internal spaces for easier matching
+                const key = h.toLowerCase().trim();
+                obj[key] = values[index] || '';
             });
             data.push(obj);
         }
@@ -167,17 +296,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function processDataAndGoNext() {
         if (leadsData.length === 0) {
-            alert("Please load some data first.");
+            const sheetUrl = document.getElementById('sheet-url-input').value;
+            const gid = document.getElementById('sheet-select').value;
+            if (sheetUrl && !gid) {
+                alert("Please select a worksheet from the dropdown first.");
+            } else {
+                alert("Please load some data first (upload a file or paste a Google Sheet link).");
+            }
             return;
         }
 
         // Clean and validate phone numbers
         const phoneMap = new Map();
         leadsData.forEach(item => {
-            // Find phone field (could be 'phone', 'contact', 'Phone Number', etc)
-            let phoneStr = item.phone || item.contact || item['Phone Number'] || '';
+            // Fuzzy match phone field: find any key that contains 'phone', 'mobile', or 'contact'
+            const keys = Object.keys(item);
+            const phoneKey = keys.find(k => k.includes('phone') || k.includes('contact') || k.includes('mobile'));
+
+            let phoneStr = phoneKey ? item[phoneKey] : '';
             // Clean phone string (keep only digits and +)
-            let cleanPhone = phoneStr.replace(/[^\d+]/g, '');
+            let cleanPhone = phoneStr ? phoneStr.toString().replace(/[^\d+]/g, '') : '';
 
             if (cleanPhone.length > 5) {
                 // Deduplicate: if same phone number appears again, ignore or merge 
