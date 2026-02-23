@@ -159,12 +159,11 @@ let waTabId = null;
 async function handleWhatsAppMessage(phone, text, fileBase64, mimeType, filename) {
     const waUrl = `https://web.whatsapp.com/send?phone=${encodeURIComponent(phone)}&text=${encodeURIComponent(text)}`;
 
-    // Check if we already have a WA tab open
+    // Reuse or create the WhatsApp Web tab
     if (waTabId) {
         try {
             await chrome.tabs.update(waTabId, { url: waUrl, active: true });
         } catch (e) {
-            // Tab was closed, create new
             const newTab = await chrome.tabs.create({ url: waUrl, active: true });
             waTabId = newTab.id;
         }
@@ -173,66 +172,146 @@ async function handleWhatsAppMessage(phone, text, fileBase64, mimeType, filename
         waTabId = newTab.id;
     }
 
-    // Wait for WA to load and execute the automation script
+    // Wait for the tab to finish loading
+    await waitForTabLoad(waTabId, 40000);
+
+    // Extra buffer for WhatsApp React to hydrate
+    await new Promise(r => setTimeout(r, 4000));
+
+    // Inject and run the automation function directly (avoids the sendMessage port-closed bug)
+    let results;
+    try {
+        results = await chrome.scripting.executeScript({
+            target: { tabId: waTabId },
+            func: waAutomationRunner,
+            args: [{ hasFile: !!fileBase64, file: fileBase64, mime: mimeType, filename: filename }]
+        });
+    } catch (err) {
+        return { success: false, error: err.toString() };
+    }
+
+    const result = results && results[0] && results[0].result;
+    if (result && result.success === false) {
+        return { success: false, error: result.error };
+    }
+    return { success: true };
+}
+
+function waitForTabLoad(tabId, timeoutMs) {
     return new Promise((resolve, reject) => {
-        let isResolved = false;
+        chrome.tabs.get(tabId, (tab) => {
+            if (tab && tab.status === 'complete') return resolve();
+        });
 
-        // Fallback timeout in case the event listener misses the payload
-        let timeoutId = setTimeout(() => {
-            if (!isResolved) {
-                isResolved = true;
+        let timeout = setTimeout(() => {
+            chrome.tabs.onUpdated.removeListener(listener);
+            reject(new Error("Tab load timeout"));
+        }, timeoutMs);
+
+        let listener = (id, changeInfo) => {
+            if (id === tabId && changeInfo.status === 'complete') {
+                clearTimeout(timeout);
                 chrome.tabs.onUpdated.removeListener(listener);
-                reject("Timeout waiting for WhatsApp tab to load.");
-            }
-        }, 45000);
-
-        let listener = function (tabId, changeInfo, tab) {
-            if (tabId === waTabId && changeInfo.status === 'complete') {
-                if (isResolved) return;
-                isResolved = true;
-                clearTimeout(timeoutId);
-                chrome.tabs.onUpdated.removeListener(listener);
-
-                // Inject the content script to perform the click
-                chrome.scripting.executeScript({
-                    target: { tabId: waTabId },
-                    files: ['whatsapp_content.js']
-                }, () => {
-                    if (chrome.runtime.lastError) {
-                        return reject(chrome.runtime.lastError.message);
-                    }
-
-                    // Wait a moment for the script to initialize its listener
-                    setTimeout(() => {
-                        // Send the data block to the content script
-                        chrome.tabs.sendMessage(waTabId, {
-                            action: 'run_wa_automation',
-                            hasFile: !!fileBase64,
-                            file: fileBase64,
-                            mime: mimeType,
-                            filename: filename
-                        }, (response) => {
-                            if (chrome.runtime.lastError || !response) {
-                                // Can fail if script wasn't ready
-                                setTimeout(() => {
-                                    chrome.tabs.sendMessage(waTabId, {
-                                        action: 'run_wa_automation',
-                                        hasFile: !!fileBase64,
-                                        file: fileBase64,
-                                        mime: mimeType,
-                                        filename: filename
-                                    }, (retryResp) => {
-                                        resolve(retryResp || { success: false, error: "No response from tab." });
-                                    });
-                                }, 5000);
-                            } else {
-                                resolve(response);
-                            }
-                        });
-                    }, 3000); // 3 seconds delay
-                });
+                resolve();
             }
         };
         chrome.tabs.onUpdated.addListener(listener);
     });
 }
+
+// This function is serialized and injected into the WA Web tab directly
+// It MUST be a standalone function (no closures over external variables)
+async function waAutomationRunner(data) {
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    function waitForEl(sel, ms) {
+        return new Promise((resolve, reject) => {
+            const el = document.querySelector(sel);
+            if (el) return resolve(el);
+            const obs = new MutationObserver(() => {
+                const el = document.querySelector(sel);
+                if (el) { obs.disconnect(); clearTimeout(t); resolve(el); }
+            });
+            obs.observe(document.body, { childList: true, subtree: true });
+            const t = setTimeout(() => { obs.disconnect(); reject(new Error('Timeout: ' + sel)); }, ms);
+        });
+    }
+
+    function base64ToBlob(b64, mime) {
+        const chars = atob(b64);
+        const arr = [];
+        for (let i = 0; i < chars.length; i += 512) {
+            const slice = chars.slice(i, i + 512);
+            const nums = new Array(slice.length);
+            for (let j = 0; j < slice.length; j++) nums[j] = slice.charCodeAt(j);
+            arr.push(new Uint8Array(nums));
+        }
+        return new Blob(arr, { type: mime });
+    }
+
+    try {
+        // Step 1: Wait for chat box OR invalid number modal
+        await waitForEl(
+            'footer, div[data-animate-modal-popup="true"], div[title="Type a message"]',
+            30000
+        );
+        await sleep(1500);
+
+        // Step 1.5: Check for invalid number modal
+        const modal = document.querySelector('div[data-animate-modal-popup="true"]');
+        if (modal) {
+            const txt = modal.innerText.toLowerCase();
+            if (txt.includes('invalid') || txt.includes('phone number shared') || txt.includes('no válido')) {
+                const btn = modal.querySelector('button');
+                if (btn) btn.click();
+                return { success: false, error: 'Contact not on WhatsApp (Invalid Number)' };
+            }
+        }
+
+        // Step 2: Send text message
+        const sendBtnSel = 'button[aria-label="Send"], button[aria-label="Enviar"], span[data-icon="send"]';
+        let sendBtn = document.querySelector(sendBtnSel);
+
+        if (!sendBtn) {
+            const chatBox = document.querySelector('div[contenteditable="true"][data-tab="10"]');
+            if (chatBox) {
+                chatBox.focus();
+                document.execCommand('insertText', false, ' ');
+                await sleep(500);
+            }
+            sendBtn = document.querySelector(sendBtnSel);
+        }
+
+        if (sendBtn) {
+            (sendBtn.closest('button') || sendBtn).click();
+            await sleep(1500);
+        }
+
+        // Step 3: Attach file if provided
+        if (data.hasFile && data.file) {
+            const blob = base64ToBlob(data.file.split(',')[1], data.mime);
+            const file = new File([blob], data.filename || 'attachment', { type: data.mime });
+
+            const drop = document.querySelector('#main') || document.body;
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            const evOpts = { bubbles: true, cancelable: true, dataTransfer: dt };
+            drop.dispatchEvent(new DragEvent('dragenter', evOpts));
+            drop.dispatchEvent(new DragEvent('dragover', evOpts));
+            drop.dispatchEvent(new DragEvent('drop', evOpts));
+
+            await sleep(2000);
+            await waitForEl('span[data-icon="send"]', 10000);
+
+            const mediaSend = document.querySelector('span[data-icon="send"]');
+            if (mediaSend) (mediaSend.closest('button') || mediaSend.closest('div[role="button"]') || mediaSend).click();
+        }
+
+        await sleep(1500);
+        return { success: true };
+    } catch (err) {
+        return { success: false, error: err.toString() };
+    }
+}
+
+
