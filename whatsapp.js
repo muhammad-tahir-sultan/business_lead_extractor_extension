@@ -164,14 +164,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
         if (match) {
             const spreadsheetId = match[1];
-            // Extract gid from URL if present (e.g., ...edit?gid=12345)
-            const gidMatch = url.match(/[?&]gid=(\d+)/);
+            // Extract gid from URL if present (e.g., ...edit?gid=12345 or ...#gid=12345)
+            const gidMatch = url.match(/[?#&]gid=(\d+)/);
             const initialGid = gidMatch ? gidMatch[1] : null;
 
-            if (spreadsheetId !== currentSpreadsheetId) {
-                currentSpreadsheetId = spreadsheetId;
-                fetchSheetList(spreadsheetId, initialGid);
-            }
+            // Always fetch list to ensure all sheets are loaded if URL changes
+            currentSpreadsheetId = spreadsheetId;
+            fetchSheetList(spreadsheetId, initialGid);
         }
     });
 
@@ -179,56 +178,91 @@ document.addEventListener('DOMContentLoaded', () => {
         sheetSelectionContainer.style.display = 'block';
         sheetSelect.innerHTML = '<option value="">-- Loading Sheets... --</option>';
 
+        // Attempt 1: Use Apps Script Web App URL (most reliable — works for private sheets)
         try {
-            const mainRes = await fetch(`https://docs.google.com/spreadsheets/d/${id}/edit`);
-            const html = await mainRes.text();
+            const storage = await new Promise(r => chrome.storage.local.get(['webAppUrl'], r));
+            if (storage.webAppUrl) {
+                const response = await fetch(storage.webAppUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'get_sheets' }),
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                });
+                const result = await response.json();
+                if (result.status === 'success' && result.sheets && result.sheets.length > 0) {
+                    sheetSelect.innerHTML = '<option value="">-- Select a Sheet --</option>' +
+                        result.sheets.map(name => `<option value="${name}">${name}</option>`).join('');
 
-            const sheets = [];
-            // Robust parsing for sheet metadata in the HTML
-            // Google Sheets embeds metadata in a few JSON blobs
-            const patterns = [
-                /{"sheetId":(\d+),"sheetName":"([^"]+)"/g,
-                /\[(\d+),"([^"]+)",\d+,\d+\]/g, // Older format
-                /gid=(\d+)[^>]*>([^<]+)<\/a>/g // Link format
-            ];
-
-            for (const pat of patterns) {
-                let m;
-                while ((m = pat.exec(html)) !== null) {
-                    const id = m[1];
-                    const name = m[2];
-                    if (name && name.length < 100 && !sheets.find(s => s.id === id)) {
-                        sheets.push({ id, name });
-                    }
+                    // Auto-select the first sheet and load its data
+                    const firstSheet = result.sheets[0];
+                    sheetSelect.value = firstSheet;
+                    loadSheetDataByName(id, firstSheet);
+                    return; // Success — no need for fallback
                 }
             }
+        } catch (e) {
+            console.warn("Web App fetch failed, falling back to public CSV approach.", e);
+        }
 
-            if (sheets.length > 0) {
-                sheetSelect.innerHTML = '<option value="">-- Select a Sheet --</option>' +
-                    sheets.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-
-                // Use preferred GID from URL, or the first sheet in the list
-                const targetGid = preferredGid || sheets[0].id;
-                sheetSelect.value = targetGid;
-                loadSheetData(id, targetGid);
-            } else {
-                // Absolute fallback
-                const fallbackGid = preferredGid || "0";
-                sheetSelect.innerHTML = `<option value="${fallbackGid}">Default Sheet</option>`;
-                loadSheetData(id, fallbackGid);
-            }
+        // Attempt 2: Fallback — try loading the default sheet directly via public CSV export
+        try {
+            const fallbackGid = preferredGid || "0";
+            sheetSelect.innerHTML = `<option value="${fallbackGid}">Default Sheet (gid: ${fallbackGid})</option>`;
+            loadSheetData(id, fallbackGid);
         } catch (err) {
             console.error("Error fetching sheets:", err);
-            sheetSelect.innerHTML = '<option value="">Error loading sheets. Check sharing settings.</option>';
+            sheetSelect.innerHTML = '<option value="">Error loading sheets. Check sharing settings or set Web App URL.</option>';
         }
     }
 
+
     sheetSelect.addEventListener('change', () => {
-        const gid = sheetSelect.value;
-        if (gid && currentSpreadsheetId) {
-            loadSheetData(currentSpreadsheetId, gid);
+        const selectedValue = sheetSelect.value;
+        if (!selectedValue || !currentSpreadsheetId) return;
+
+        // If the value looks like a pure number, it's a gid (fallback mode)
+        // If it contains non-numeric chars, it's a sheet name (Web App mode)
+        if (/^\d+$/.test(selectedValue)) {
+            loadSheetData(currentSpreadsheetId, selectedValue);
+        } else {
+            loadSheetDataByName(currentSpreadsheetId, selectedValue);
         }
     });
+
+    // Load sheet data by NAME via Apps Script Web App
+    async function loadSheetDataByName(spreadsheetId, sheetName) {
+        leadsBadge.innerText = 'Loading Data...';
+        try {
+            const storage = await new Promise(r => chrome.storage.local.get(['webAppUrl'], r));
+            if (!storage.webAppUrl) {
+                leadsBadge.innerText = 'Web App URL not set';
+                leadsBadge.style.color = '#f87171';
+                alert("Please set your Google Apps Script Web App URL first (via the main extension popup).");
+                return;
+            }
+
+            const response = await fetch(storage.webAppUrl, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'get_sheet_data', sheetName: sheetName }),
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            });
+            const result = await response.json();
+
+            if (result.status === 'success' && result.data) {
+                leadsData = result.data;
+                leadsBadge.innerText = `${leadsData.length} Leads Ready (${sheetName})`;
+                leadsBadge.style.color = '#34d399';
+                leadsBadge.style.backgroundColor = 'rgba(52, 211, 153, 0.15)';
+            } else {
+                // Fallback: try public CSV export with gid=0
+                console.warn("Web App data fetch failed, trying public CSV export...");
+                loadSheetData(spreadsheetId, "0");
+            }
+        } catch (err) {
+            console.error("Error loading sheet data by name:", err);
+            // Fallback: try public CSV export
+            loadSheetData(spreadsheetId, "0");
+        }
+    }
 
     async function loadSheetData(spreadsheetId, gid) {
         leadsBadge.innerText = 'Loading Data...';

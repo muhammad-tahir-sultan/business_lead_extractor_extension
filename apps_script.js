@@ -31,6 +31,35 @@ function doPost(e) {
             return ContentService.createTextOutput(JSON.stringify({ "status": "success", "sheets": sheetNames }))
                 .setMimeType(ContentService.MimeType.JSON);
         }
+        else if (action === 'get_sheet_data') {
+            var targetSheetName = payload.sheetName;
+            var targetSheet = targetSheetName ? spreadsheet.getSheetByName(targetSheetName) : spreadsheet.getActiveSheet();
+            if (!targetSheet) {
+                return ContentService.createTextOutput(JSON.stringify({ "status": "error", "message": "Sheet not found: " + targetSheetName }))
+                    .setMimeType(ContentService.MimeType.JSON);
+            }
+            var lastRow = targetSheet.getLastRow();
+            var lastCol = targetSheet.getLastColumn();
+            if (lastRow < 2 || lastCol < 1) {
+                return ContentService.createTextOutput(JSON.stringify({ "status": "success", "data": [] }))
+                    .setMimeType(ContentService.MimeType.JSON);
+            }
+            var headers = targetSheet.getRange(1, 1, 1, lastCol).getValues()[0];
+            var dataRange = targetSheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+            var rows = [];
+            for (var r = 0; r < dataRange.length; r++) {
+                var obj = {};
+                for (var c = 0; c < headers.length; c++) {
+                    var key = (headers[c] || '').toString().toLowerCase().trim();
+                    if (key) {
+                        obj[key] = (dataRange[r][c] || '').toString();
+                    }
+                }
+                rows.push(obj);
+            }
+            return ContentService.createTextOutput(JSON.stringify({ "status": "success", "data": rows }))
+                .setMimeType(ContentService.MimeType.JSON);
+        }
         else if (action === 'new_tab') {
             if (payload.tabName) {
                 var newTabName = payload.tabName;
