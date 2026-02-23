@@ -303,18 +303,27 @@ Full Stack Developer</textarea>
                                 </div>
 
                                 <!-- Campaign Control Buttons -->
-                                <div id="campaign-controls" style="display: flex; gap: 10px; margin-top: 15px;">
+                                <div id="campaign-controls"
+                                    style="display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap;">
                                     <!-- Shown while running -->
                                     <button id="stop-campaign-btn" class="danger-btn" style="flex: 1;">
                                         ⏹ STOP CAMPAIGN
                                     </button>
 
                                     <!-- Shown after stopped -->
-                                    <button id="resume-campaign-btn" class="primary-btn" style="flex: 1; display: none;">
+                                    <button id="resume-campaign-btn" class="primary-btn"
+                                        style="flex: 1; display: none;">
                                         ▶ RESUME FROM HERE
                                     </button>
-                                    <button id="restart-campaign-btn" class="nav-btn-secondary" style="flex: 1; display: none;">
+                                    <button id="restart-campaign-btn" class="nav-btn-secondary"
+                                        style="flex: 1; display: none;">
                                         🔄 RESTART FROM BEGINNING
+                                    </button>
+
+                                    <!-- Download Excel: always visible after campaign starts -->
+                                    <button id="download-excel-btn" class="excel-btn"
+                                        style="width: 100%; margin-top: 6px; display: none;">
+                                        📥 DOWNLOAD UPDATED EXCEL
                                     </button>
                                 </div>
                             </div>
@@ -325,6 +334,7 @@ Full Stack Developer</textarea>
             </div>
         </main>
     </div>
+    <script src="xlsx.min.js"></script>
     <script src="whatsapp.js"></script>
 </body>
 

@@ -152,22 +152,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Clean and validate phone numbers
-        validContacts = leadsData.map(item => {
+        const phoneMap = new Map();
+        leadsData.forEach(item => {
             // Find phone field (could be 'phone', 'contact', 'Phone Number', etc)
             let phoneStr = item.phone || item.contact || item['Phone Number'] || '';
-
             // Clean phone string (keep only digits and +)
             let cleanPhone = phoneStr.replace(/[^\d+]/g, '');
 
-            // Make sure it has a country code, or assume based on user preference
-            // For now, if it starts with 0 or a number not +, we just pass it to WA and let WA decide
+            if (cleanPhone.length > 5) {
+                // Deduplicate: if same phone number appears again, ignore or merge 
+                // We keep the first occurrence
+                if (!phoneMap.has(cleanPhone)) {
+                    phoneMap.set(cleanPhone, {
+                        ...item,
+                        _processedPhone: cleanPhone
+                    });
+                }
+            }
+        });
 
-            // Store original item for variable replacements
-            return {
-                ...item,
-                _processedPhone: cleanPhone
-            };
-        }).filter(item => item._processedPhone.length > 5); // Basic validation
+        validContacts = Array.from(phoneMap.values());
 
         if (validContacts.length === 0) {
             alert("No valid phone numbers found in the dataset. Please ensure there is a 'phone' or 'contact' column.");
@@ -279,6 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const resumeBtn = document.getElementById('resume-campaign-btn');
         const restartBtn = document.getElementById('restart-campaign-btn');
         const progressArea = document.getElementById('live-progress-area');
+        const excelBtn = document.getElementById('download-excel-btn');
 
         if (state === 'idle') {
             launchBtn.style.display = 'block';
@@ -286,24 +291,28 @@ document.addEventListener('DOMContentLoaded', () => {
             stopBtn.style.display = 'none';
             resumeBtn.style.display = 'none';
             restartBtn.style.display = 'none';
+            excelBtn.style.display = 'none';
         } else if (state === 'running') {
             launchBtn.style.display = 'none';
             progressArea.style.display = 'block';
             stopBtn.style.display = 'flex';
             resumeBtn.style.display = 'none';
             restartBtn.style.display = 'none';
+            excelBtn.style.display = 'flex';
         } else if (state === 'stopped') {
             launchBtn.style.display = 'none';
             progressArea.style.display = 'block';
             stopBtn.style.display = 'none';
             resumeBtn.style.display = 'flex';
             restartBtn.style.display = 'flex';
+            excelBtn.style.display = 'flex';
         } else if (state === 'complete') {
             launchBtn.style.display = 'none';
             progressArea.style.display = 'block';
             stopBtn.style.display = 'none';
             resumeBtn.style.display = 'none';
             restartBtn.style.display = 'flex';
+            excelBtn.style.display = 'flex';
         }
     }
 
@@ -385,6 +394,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const response = await sendWhatsAppMessage(phone, msg, attachmentBase64, attachmentMimeType, attachmentName);
                 if (response.success) {
                     logMsg(`✅ Sent to ${phone}`, "success");
+                    // Mark contact as sent in the scraped data
+                    chrome.runtime.sendMessage({
+                        action: 'update_wa_sent_status',
+                        phone: phone
+                    });
                 } else {
                     logMsg(`❌ Failed for ${phone}: ${response.error}`, "error");
                 }
@@ -459,5 +473,52 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     }
+
+    // Download Updated Excel — includes Sent Status column updated live
+    document.getElementById('download-excel-btn').addEventListener('click', () => {
+        chrome.runtime.sendMessage({ action: 'get_status' }, (state) => {
+            const data = (state && state.data) || [];
+            if (data.length === 0) {
+                logMsg('⚠️ No scraped data found to export.', 'error');
+                return;
+            }
+
+            const rows = data.map(item => ({
+                'Name': item.name || '',
+                'Rating': item.rating || '',
+                'Reviews': item.reviews || '',
+                'Google Maps URL': item.url || '',
+                'Website': item.website || '',
+                'Phone': item.contact || item.phone || '',
+                'Email': item.emails || '',
+                'Sent Status': item.sentStatus || '',
+                'Next Follow-Up Date': '',
+                'Follow-Up Stage': '',
+                'Date Scraped': new Date().toISOString().split('T')[0],
+                'Source': 'Google Maps Scraper',
+                'Notes': '',
+                'LinkedIn URL': item.linkedin || '',
+                'Facebook': item.facebook || ''
+            }));
+
+            const worksheet = XLSX.utils.json_to_sheet(rows);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Leads');
+
+            const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `wa_campaign_${new Date().getTime()}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            logMsg('📥 Excel downloaded with updated Sent Status!', 'success');
+        });
+    });
 
 });

@@ -145,6 +145,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse(scrapingState);
     }
 
+    if (request.action === 'update_wa_sent_status') {
+        // Mark the contact as sent in the scraped data by matching phone number
+        const phone = (request.phone || '').replace(/\D/g, ''); // strip non-digits for comparison
+        if (scrapingState.data && scrapingState.data.length > 0) {
+            scrapingState.data = scrapingState.data.map(item => {
+                const itemPhone = (item.contact || item.phone || '').replace(/\D/g, '');
+                if (itemPhone && itemPhone.includes(phone.slice(-9))) {
+                    // Match last 9 digits to handle country code differences
+                    return { ...item, sentStatus: 'Whatsapp Message Sent' };
+                }
+                return item;
+            });
+            saveState();
+        }
+        sendResponse({ success: true });
+    }
+
     if (request.action === 'send_whatsapp_message') {
         handleWhatsAppMessage(request.phone, request.text, request.file, request.mime, request.filename)
             .then(result => sendResponse(result))
@@ -394,73 +411,83 @@ async function waAutomationRunner(data) {
             return { success: false, error: 'Chat box not found - WhatsApp may not have loaded the chat.' };
         }
 
-        // STEP 4: STRICT CHECK — verify chatbox has text.
-        // WA sometimes loses the URL ?text= param on internal navigation.
-        // If chatbox is empty, type the message manually.
-        chatBox.click();
-        chatBox.focus();
-        await sleep(800);
+        // STEP 4/5/6: Handle text message ONLY if there is no file,
+        // OR if there is a file, we skip sending text first and send it as a caption instead.
+        let chatBoxHasTextAndNeedToSend = false;
 
-        let chatText = getChatboxText(chatBox);
+        if (data.messageText && !data.hasFile) {
+            // STRICT CHECK — verify chatbox has text.
+            chatBox.click();
+            chatBox.focus();
+            await sleep(800);
 
-        if (!chatText && data.messageText) {
-            // Chatbox is EMPTY — WA lost the pre-filled text, type it manually
-            await typeIntoChat(chatBox, data.messageText);
-            await sleep(500);
-            chatText = getChatboxText(chatBox);
-        }
+            let chatText = getChatboxText(chatBox);
 
-        // Give WA time to process input and enable the send button
-        chatBox.dispatchEvent(new Event('focus', { bubbles: true }));
-        chatBox.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'End', keyCode: 35 }));
-        chatBox.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'End', keyCode: 35 }));
-        chatBox.dispatchEvent(new InputEvent('input', { bubbles: true }));
-        await sleep(1000);
-
-        // STEP 5: Find send button — retry up to 8 times
-        let sendBtn = null;
-        for (let attempt = 0; attempt < 8; attempt++) {
-            sendBtn = findSendButton();
-            if (sendBtn) break;
-            // Re-nudge chatbox to activate send button
-            chatBox.dispatchEvent(new InputEvent('input', { bubbles: true }));
-            chatBox.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: ' ', keyCode: 32 }));
-            chatBox.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: ' ', keyCode: 32 }));
-            await sleep(600);
-        }
-
-        // STEP 6: Click send and VERIFY it was sent
-        let messageSent = false;
-
-        if (sendBtn) {
-            for (let sendAttempt = 0; sendAttempt < 4; sendAttempt++) {
-                sendBtn.click();
-                // Wait and check if chatbox emptied (= message was sent)
-                await sleep(2000);
-                const textAfterSend = getChatboxText(chatBox);
-                if (!textAfterSend || textAfterSend.length === 0) {
-                    messageSent = true;
-                    break; // Confirmed sent!
-                }
-                // Still has text — button might need another click, re-find it
+            if (!chatText) {
+                // Chatbox is EMPTY — WA lost the pre-filled text, type it manually
+                await typeIntoChat(chatBox, data.messageText);
                 await sleep(500);
-                sendBtn = findSendButton();
-                if (!sendBtn) break;
+            }
+
+            // Give WA time to process input and enable the send button
+            chatBox.dispatchEvent(new Event('focus', { bubbles: true }));
+            chatBox.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'End', keyCode: 35 }));
+            chatBox.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'End', keyCode: 35 }));
+            chatBox.dispatchEvent(new InputEvent('input', { bubbles: true }));
+            await sleep(1000);
+
+            chatBoxHasTextAndNeedToSend = true;
+        } else if (data.messageText && data.hasFile) {
+            // We have a file AND text. Clear any pre-filled URL text from the chatbox to avoid sending it twice.
+            // (Because we will send it as a caption instead)
+            chatBox.click();
+            chatBox.focus();
+            await sleep(500);
+            let chatText = getChatboxText(chatBox);
+            if (chatText) {
+                // Select all and delete
+                document.execCommand('selectAll', false, null);
+                document.execCommand('delete', false, null);
+                await sleep(500);
             }
         }
 
-        if (!messageSent) {
-            // Last resort: press Enter key to send
-            chatBox.focus();
-            chatBox.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter', keyCode: 13, which: 13 }));
-            chatBox.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, cancelable: true, key: 'Enter', keyCode: 13, which: 13 }));
-            await sleep(2000);
-            // Final check
-            const finalText = getChatboxText(chatBox);
-            if (finalText && finalText.length > 0) {
-                // Message might still be in box but WA could have sent it internally
-                // Don't fail — log as uncertain
-                console.warn('[WA Blast] Could not confirm send via chatbox empty check.');
+        // Send text if needed (no file attached)
+        if (chatBoxHasTextAndNeedToSend) {
+            // Find send button — retry up to 8 times
+            let sendBtn = null;
+            for (let attempt = 0; attempt < 8; attempt++) {
+                sendBtn = findSendButton();
+                if (sendBtn) break;
+                // Re-nudge chatbox to activate send button
+                chatBox.dispatchEvent(new InputEvent('input', { bubbles: true }));
+                chatBox.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: ' ', keyCode: 32 }));
+                chatBox.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: ' ', keyCode: 32 }));
+                await sleep(600);
+            }
+
+            // Click send and VERIFY it was sent
+            let messageSent = false;
+            if (sendBtn) {
+                for (let sendAttempt = 0; sendAttempt < 4; sendAttempt++) {
+                    sendBtn.click();
+                    await sleep(2000);
+                    const textAfterSend = getChatboxText(chatBox);
+                    if (!textAfterSend || textAfterSend.length === 0) {
+                        messageSent = true;
+                        break; // Confirmed sent!
+                    }
+                    await sleep(500);
+                    sendBtn = findSendButton();
+                    if (!sendBtn) break;
+                }
+            }
+
+            if (!messageSent) {
+                chatBox.focus();
+                chatBox.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter', keyCode: 13, which: 13 }));
+                chatBox.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, cancelable: true, key: 'Enter', keyCode: 13, which: 13 }));
+                await sleep(2000);
             }
         }
 
@@ -468,21 +495,112 @@ async function waAutomationRunner(data) {
         if (data.hasFile && data.file) {
             const blob = base64ToBlob(data.file.split(',')[1], data.mime);
             const file = new File([blob], data.filename || 'attachment', { type: data.mime });
-
-            const drop = document.querySelector('#main') || document.body;
             const dt = new DataTransfer();
             dt.items.add(file);
-            const evOpts = { bubbles: true, cancelable: true, dataTransfer: dt };
-            drop.dispatchEvent(new DragEvent('dragenter', evOpts));
-            drop.dispatchEvent(new DragEvent('dragover', evOpts));
-            drop.dispatchEvent(new DragEvent('drop', evOpts));
 
-            await sleep(2500);
-            await waitForEl(SEND_ICON_SEL, 12000);
-            await sleep(600);
-            const mediaSend = findSendButton();
-            if (mediaSend) mediaSend.click();
-            await sleep(2000);
+            // 1. Click the "+" (plus) icon to open the attachment menu.
+            // In the new WA UI, this attaches the file inputs to the DOM.
+            const plusIcon = document.querySelector('span[data-icon="plus-rounded"], span[data-icon="clip"]');
+            if (plusIcon) {
+                const plusBtn = plusIcon.closest('button') || plusIcon.parentElement || plusIcon;
+                // Wait for any previous send button overlays to clear
+                await sleep(500);
+                plusBtn.click();
+                await sleep(1000); // Wait for menu to animate in and mount hidden inputs
+            }
+
+            // 2. Find the hidden file inputs that appear in the menu
+            const fileInputs = document.querySelectorAll('input[type="file"]');
+            let targetInput = null;
+
+            if (data.mime.startsWith('image/') || data.mime.startsWith('video/')) {
+                // The Photo/Video option input Usually has accept="image/*,video/mp4,..."
+                targetInput = Array.from(fileInputs).find(i => i.accept && i.accept.includes('image/'));
+            } else {
+                // The Document option input (for PDFs, etc.) usually has accept="*"
+                targetInput = Array.from(fileInputs).find(i => i.accept === '*' || !i.accept);
+            }
+
+            // Fallback: Just grab the first file input
+            if (!targetInput && fileInputs.length > 0) {
+                targetInput = fileInputs[0];
+            }
+
+            if (targetInput) {
+                // 3. Inject our file directly into the input and trigger React's change handler
+                targetInput.files = dt.files;
+                targetInput.dispatchEvent(new Event('change', { bubbles: true }));
+            } else {
+                // Fallback: Drag-and-Drop if no inputs could be found
+                console.warn('[WA Blast] No file inputs found in menu, falling back to Drag-and-Drop.');
+                const drop = document.querySelector('#main') || document.body;
+                const evOpts = { bubbles: true, cancelable: true, dataTransfer: dt };
+                drop.dispatchEvent(new DragEvent('dragenter', evOpts));
+                drop.dispatchEvent(new DragEvent('dragover', evOpts));
+                drop.dispatchEvent(new DragEvent('drop', evOpts));
+            }
+
+            await sleep(2500); // give WhatsApp time to open media preview wrapper
+
+            // 4. Type the CAPTION if text was provided and we brought a file
+            if (data.messageText) {
+                // Look for caption box in the media preview overlay
+                // The caption box usually has title="Add a caption" or similar contenteditable div in the overlay
+                let captionBox = null;
+                const captionSelectors = [
+                    'div[contenteditable="true"][title="Add a caption"]',
+                    'div[contenteditable="true"][data-tab="10"]',
+                    'div[contenteditable="true"][title="Añade un comentario"]',
+                    'div[contenteditable="true"]'
+                ];
+
+                for (let i = 0; i < 5; i++) {
+                    let editables = document.querySelectorAll('div[contenteditable="true"]');
+                    // We want the last editable loaded (usually the caption overlay, not the background chatbox)
+                    if (editables && editables.length > 0) {
+                        // The active overlay textbox
+                        captionBox = editables[editables.length - 1];
+                    }
+                    if (captionBox) break;
+                    await sleep(500);
+                }
+
+                if (captionBox) {
+                    captionBox.click();
+                    captionBox.focus();
+                    await sleep(500);
+                    await typeIntoChat(captionBox, data.messageText);
+                    await sleep(500);
+                    captionBox.dispatchEvent(new Event('focus', { bubbles: true }));
+                    captionBox.dispatchEvent(new InputEvent('input', { bubbles: true }));
+                    await sleep(1000);
+                } else {
+                    console.warn('[WA Blast] Could not find caption box, sending file without caption.');
+                }
+            }
+
+            let mediaSendBtn = null;
+            for (let i = 0; i < 15; i++) {
+                mediaSendBtn = findSendButton();
+                if (mediaSendBtn) break;
+
+                // Fallback check for new WA UI changes just for media send:
+                const fallbackBtn = document.querySelector('div[role="button"][aria-label="Send"], button[aria-label="Send"], span[data-icon="send-light"]');
+                if (fallbackBtn) {
+                    mediaSendBtn = fallbackBtn;
+                    break;
+                }
+
+                await sleep(1000);
+            }
+
+            if (mediaSendBtn) {
+                mediaSendBtn.click();
+            } else {
+                console.warn('[WA Blast] Could not find media send button, falling back to Enter...');
+                document.body.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter', keyCode: 13, which: 13 }));
+            }
+            await sleep(3500); // Wait for file to actually send before proceeding
         }
 
         await sleep(1000);
