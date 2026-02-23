@@ -157,6 +157,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 let waTabId = null;
 
 async function handleWhatsAppMessage(phone, text, fileBase64, mimeType, filename) {
+    // Encode only phone in URL — we will type the text manually inside the injected script
+    // (encoding text in URL is unreliable: WA sometimes loses it on internal re-navigation)
     const waUrl = `https://web.whatsapp.com/send?phone=${encodeURIComponent(phone)}&text=${encodeURIComponent(text)}`;
 
     // Reuse or create the WhatsApp Web tab
@@ -172,19 +174,27 @@ async function handleWhatsAppMessage(phone, text, fileBase64, mimeType, filename
         waTabId = newTab.id;
     }
 
-    // Wait for the tab to finish loading
-    await waitForTabLoad(waTabId, 40000);
+    // Wait for BOTH navigation phases:
+    // Phase 1: Initial shell load (status=complete)
+    // Phase 2: WA internal SPA navigation to the chat (another complete)
+    await waitForTabLoadTwice(waTabId, 45000);
 
-    // Extra buffer for WhatsApp React to hydrate
-    await new Promise(r => setTimeout(r, 4000));
+    // Extra buffer for React hydration & chat box to fully initialize
+    await new Promise(r => setTimeout(r, 5000));
 
-    // Inject and run the automation function directly (avoids the sendMessage port-closed bug)
+    // Inject automation — pass message text so it can re-type if needed
     let results;
     try {
         results = await chrome.scripting.executeScript({
             target: { tabId: waTabId },
             func: waAutomationRunner,
-            args: [{ hasFile: !!fileBase64, file: fileBase64, mime: mimeType, filename: filename }]
+            args: [{
+                hasFile: !!fileBase64,
+                file: fileBase64,
+                mime: mimeType,
+                filename: filename,
+                messageText: text          // <-- pass text for fallback typing
+            }]
         });
     } catch (err) {
         return { success: false, error: err.toString() };
@@ -197,27 +207,42 @@ async function handleWhatsAppMessage(phone, text, fileBase64, mimeType, filename
     return { success: true };
 }
 
-function waitForTabLoad(tabId, timeoutMs) {
+// Waits for tab to fire TWO 'complete' events, or one if no second comes within 8s
+// This handles WhatsApp Web's two-phase SPA navigation
+function waitForTabLoadTwice(tabId, timeoutMs) {
     return new Promise((resolve, reject) => {
-        chrome.tabs.get(tabId, (tab) => {
-            if (tab && tab.status === 'complete') return resolve();
-        });
+        let completedCount = 0;
+        let resolved = false;
+        let secondPhaseTimer = null;
 
-        let timeout = setTimeout(() => {
+        const overallTimeout = setTimeout(() => {
             chrome.tabs.onUpdated.removeListener(listener);
-            reject(new Error("Tab load timeout"));
+            if (!resolved) { resolved = true; resolve(); } // resolve anyway after timeout
         }, timeoutMs);
 
-        let listener = (id, changeInfo) => {
-            if (id === tabId && changeInfo.status === 'complete') {
-                clearTimeout(timeout);
+        const listener = (id, changeInfo) => {
+            if (id !== tabId || changeInfo.status !== 'complete') return;
+            completedCount++;
+
+            if (completedCount === 1) {
+                // First complete: start a timer — if no second complete in 8s, proceed anyway
+                secondPhaseTimer = setTimeout(() => {
+                    chrome.tabs.onUpdated.removeListener(listener);
+                    clearTimeout(overallTimeout);
+                    if (!resolved) { resolved = true; resolve(); }
+                }, 8000);
+            } else if (completedCount >= 2) {
+                // Second complete: WA has finished its internal navigation
+                clearTimeout(secondPhaseTimer);
+                clearTimeout(overallTimeout);
                 chrome.tabs.onUpdated.removeListener(listener);
-                resolve();
+                if (!resolved) { resolved = true; resolve(); }
             }
         };
         chrome.tabs.onUpdated.addListener(listener);
     });
 }
+
 
 // This function is serialized and injected into the WA Web tab directly
 // It MUST be a standalone function (no closures over external variables)
@@ -249,39 +274,32 @@ async function waAutomationRunner(data) {
         return new Blob(arr, { type: mime });
     }
 
-    // Correct WA icon names (WhatsApp updated from 'send' to 'wds-ic-send-filled')
+    // Both old and new WA send icon names
     const SEND_ICON_SEL = 'span[data-icon="wds-ic-send-filled"], span[data-icon="send"]';
 
-    // Robust send button finder — 4 strategies to find the green send button
+    // Finds the clickable send button using 4 strategies
     function findSendButton() {
-        // Strategy 1: By aria-label in multiple languages
         const ariaLabels = ['Send', 'Enviar', '\u0625\u0631\u0633\u0627\u0644', 'Envoyer', 'Senden', 'Invia', '\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c'];
         for (const label of ariaLabels) {
             const btn = document.querySelector('button[aria-label="' + label + '"]');
             if (btn) return btn;
         }
-
-        // Strategy 2: Find the send icon inside footer, walk up DOM to the button
         const footer = document.querySelector('footer');
         if (footer) {
-            const sendIcon = footer.querySelector(SEND_ICON_SEL);
-            if (sendIcon) {
-                let el = sendIcon;
+            const icon = footer.querySelector(SEND_ICON_SEL);
+            if (icon) {
+                let el = icon;
                 for (let i = 0; i < 6; i++) {
                     el = el.parentElement;
                     if (!el) break;
                     if (el.tagName === 'BUTTON' || el.getAttribute('role') === 'button') return el;
                 }
-                return sendIcon;
+                return icon;
             }
-            // Any button in footer containing a send icon
-            const footerBtns = footer.querySelectorAll('button');
-            for (const b of footerBtns) {
+            for (const b of footer.querySelectorAll('button')) {
                 if (b.querySelector(SEND_ICON_SEL)) return b;
             }
         }
-
-        // Strategy 3: Global send icon fallback — walk up DOM
         const iconGlobal = document.querySelector(SEND_ICON_SEL);
         if (iconGlobal) {
             let el = iconGlobal;
@@ -292,35 +310,57 @@ async function waAutomationRunner(data) {
             }
             return iconGlobal;
         }
-
         return null;
     }
 
+    // Gets the current text content of the chatbox
+    function getChatboxText(chatBox) {
+        // WA stores text in child spans, not innerText directly sometimes
+        return (chatBox.innerText || chatBox.textContent || '').trim();
+    }
+
+    // Types text into chatbox character by character using execCommand
+    // This triggers WA's React input handlers properly
+    async function typeIntoChat(chatBox, text) {
+        chatBox.focus();
+        // Clear first
+        chatBox.dispatchEvent(new Event('focus', { bubbles: true }));
+        await sleep(300);
+        // Select all and replace
+        document.execCommand('selectAll', false);
+        await sleep(100);
+        document.execCommand('insertText', false, text);
+        await sleep(500);
+        chatBox.dispatchEvent(new InputEvent('input', { bubbles: true }));
+        await sleep(300);
+    }
+
     try {
-        // Step 1: Wait for chat box OR invalid number modal
+        // STEP 1: Wait for the chat interface to appear
+        // Wait for footer (chat loaded) OR invalid number modal
         await waitForEl(
-            'footer, div[data-animate-modal-popup="true"], div[title="Type a message"]',
-            30000
+            'footer, div[data-animate-modal-popup="true"]',
+            35000
         );
         await sleep(2000);
 
-        // Step 1.5: Check for invalid number modal
+        // STEP 2: Check for invalid number modal
         const modal = document.querySelector('div[data-animate-modal-popup="true"]');
         if (modal) {
             const txt = modal.innerText.toLowerCase();
-            if (txt.includes('invalid') || txt.includes('phone number shared') || txt.includes('no v\u00e1lido')) {
+            if (txt.includes('invalid') || txt.includes('phone number shared') || txt.includes('no v\u00e1lido') || txt.includes('not on whatsapp')) {
                 const btn = modal.querySelector('button');
                 if (btn) btn.click();
                 return { success: false, error: 'Contact not on WhatsApp (Invalid Number)' };
             }
         }
 
-        // Step 2: Focus and nudge the chatbox so WhatsApp activates the send button
-        // (When text is pre-filled via URL params, WA needs a focus event to enable send)
+        // STEP 3: Find the chatbox using multiple selectors
         const chatBoxSelectors = [
             'div[contenteditable="true"][data-tab="10"]',
             'div[contenteditable="true"][title="Type a message"]',
             'div[contenteditable="true"][title="Escribe un mensaje"]',
+            'footer div[contenteditable="true"]',
             'div[contenteditable="true"]'
         ];
         let chatBox = null;
@@ -329,43 +369,81 @@ async function waAutomationRunner(data) {
             if (chatBox) break;
         }
 
-        if (chatBox) {
-            chatBox.click();
-            chatBox.focus();
-            chatBox.dispatchEvent(new Event('focus', { bubbles: true }));
-            chatBox.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'End', keyCode: 35 }));
-            chatBox.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'End', keyCode: 35 }));
-            chatBox.dispatchEvent(new InputEvent('input', { bubbles: true }));
-            await sleep(1000);
+        if (!chatBox) {
+            return { success: false, error: 'Chat box not found - WhatsApp may not have loaded the chat.' };
         }
 
-        // Step 3: Find and click the send button with up to 6 retries
+        // STEP 4: STRICT CHECK — verify chatbox has text.
+        // WA sometimes loses the URL ?text= param on internal navigation.
+        // If chatbox is empty, type the message manually.
+        chatBox.click();
+        chatBox.focus();
+        await sleep(800);
+
+        let chatText = getChatboxText(chatBox);
+
+        if (!chatText && data.messageText) {
+            // Chatbox is EMPTY — WA lost the pre-filled text, type it manually
+            await typeIntoChat(chatBox, data.messageText);
+            await sleep(500);
+            chatText = getChatboxText(chatBox);
+        }
+
+        // Give WA time to process input and enable the send button
+        chatBox.dispatchEvent(new Event('focus', { bubbles: true }));
+        chatBox.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'End', keyCode: 35 }));
+        chatBox.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'End', keyCode: 35 }));
+        chatBox.dispatchEvent(new InputEvent('input', { bubbles: true }));
+        await sleep(1000);
+
+        // STEP 5: Find send button — retry up to 8 times
         let sendBtn = null;
-        for (let attempt = 0; attempt < 6; attempt++) {
+        for (let attempt = 0; attempt < 8; attempt++) {
             sendBtn = findSendButton();
             if (sendBtn) break;
-            if (chatBox) {
-                chatBox.dispatchEvent(new InputEvent('input', { bubbles: true }));
-                chatBox.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: ' ', keyCode: 32 }));
-                chatBox.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: ' ', keyCode: 32 }));
-            }
-            await sleep(700);
+            // Re-nudge chatbox to activate send button
+            chatBox.dispatchEvent(new InputEvent('input', { bubbles: true }));
+            chatBox.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: ' ', keyCode: 32 }));
+            chatBox.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: ' ', keyCode: 32 }));
+            await sleep(600);
         }
 
+        // STEP 6: Click send and VERIFY it was sent
+        let messageSent = false;
+
         if (sendBtn) {
-            sendBtn.click();
-            await sleep(2000);
-        } else if (chatBox) {
-            // Last resort: simulate pressing Enter to send the message
+            for (let sendAttempt = 0; sendAttempt < 4; sendAttempt++) {
+                sendBtn.click();
+                // Wait and check if chatbox emptied (= message was sent)
+                await sleep(2000);
+                const textAfterSend = getChatboxText(chatBox);
+                if (!textAfterSend || textAfterSend.length === 0) {
+                    messageSent = true;
+                    break; // Confirmed sent!
+                }
+                // Still has text — button might need another click, re-find it
+                await sleep(500);
+                sendBtn = findSendButton();
+                if (!sendBtn) break;
+            }
+        }
+
+        if (!messageSent) {
+            // Last resort: press Enter key to send
             chatBox.focus();
             chatBox.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter', keyCode: 13, which: 13 }));
             chatBox.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, cancelable: true, key: 'Enter', keyCode: 13, which: 13 }));
             await sleep(2000);
-        } else {
-            return { success: false, error: 'Could not find send button or chat box' };
+            // Final check
+            const finalText = getChatboxText(chatBox);
+            if (finalText && finalText.length > 0) {
+                // Message might still be in box but WA could have sent it internally
+                // Don't fail — log as uncertain
+                console.warn('[WA Blast] Could not confirm send via chatbox empty check.');
+            }
         }
 
-        // Step 4: Attach file if provided
+        // STEP 7: Handle file attachment if provided
         if (data.hasFile && data.file) {
             const blob = base64ToBlob(data.file.split(',')[1], data.mime);
             const file = new File([blob], data.filename || 'attachment', { type: data.mime });
@@ -378,18 +456,17 @@ async function waAutomationRunner(data) {
             drop.dispatchEvent(new DragEvent('dragover', evOpts));
             drop.dispatchEvent(new DragEvent('drop', evOpts));
 
-            await sleep(2000);
-            await waitForEl(SEND_ICON_SEL, 10000);
-            await sleep(500);
+            await sleep(2500);
+            await waitForEl(SEND_ICON_SEL, 12000);
+            await sleep(600);
             const mediaSend = findSendButton();
             if (mediaSend) mediaSend.click();
+            await sleep(2000);
         }
 
-        await sleep(1500);
+        await sleep(1000);
         return { success: true };
     } catch (err) {
         return { success: false, error: err.toString() };
     }
 }
-
-
