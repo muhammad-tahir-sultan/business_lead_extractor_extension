@@ -163,7 +163,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     if (request.action === 'send_whatsapp_message') {
-        handleWhatsAppMessage(request.phone, request.text, request.file, request.mime, request.filename)
+        handleWhatsAppMessage(request.phone, request.text, request.file, request.mime, request.filename, request.skipExisting)
             .then(result => sendResponse(result))
             .catch(err => sendResponse({ success: false, error: err.toString() }));
         return true; // Keep message channel open for async response
@@ -173,7 +173,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // WhatsApp Blast Logic
 let waTabId = null;
 
-async function handleWhatsAppMessage(phone, text, fileBase64, mimeType, filename) {
+async function handleWhatsAppMessage(phone, text, fileBase64, mimeType, filename, skipExisting) {
     // Encode only phone in URL — we will type the text manually inside the injected script
     // (encoding text in URL is unreliable: WA sometimes loses it on internal re-navigation)
     const waUrl = `https://web.whatsapp.com/send?phone=${encodeURIComponent(phone)}&text=${encodeURIComponent(text)}`;
@@ -210,7 +210,8 @@ async function handleWhatsAppMessage(phone, text, fileBase64, mimeType, filename
                 file: fileBase64,
                 mime: mimeType,
                 filename: filename,
-                messageText: text          // <-- pass text for fallback typing
+                messageText: text,         // <-- pass text for fallback typing
+                skipExisting: skipExisting // <-- pass flag to skip if chat history exists
             }]
         });
     } catch (err) {
@@ -391,6 +392,21 @@ async function waAutomationRunner(data) {
         if (dismissBtn) {
             dismissBtn.click(); // dismiss the OK modal
             return { success: false, error: "Number isn't on WhatsApp — skipped" };
+        }
+
+        // STEP 2.5: Check for existing chat history if user opted to skip
+        if (data.skipExisting) {
+            // Give WhatsApp chat body a brief moment to render message history (SPA)
+            await sleep(1000);
+
+            // WA Web uses `message-in` (incoming) and `message-out` (outgoing) classes,
+            // or role="row" for message containers.
+            const messages = document.querySelectorAll('div.message-in, div.message-out');
+
+            // Only count if there's actual chat text, ignoring system messages like "encryption" alerts
+            if (messages.length > 0) {
+                return { success: false, error: "Skipped — Chat history already exists." };
+            }
         }
 
         // STEP 3: Find the chatbox using multiple selectors

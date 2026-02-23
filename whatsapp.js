@@ -362,6 +362,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const randDelay = document.getElementById('randomize-delay').checked;
         const pauseBatch = document.getElementById('pause-batch').checked;
         const batchSize = parseInt(document.getElementById('batch-size').value);
+        const skipExisting = document.getElementById('skip-existing').checked;
 
         if (fromIndex === 0) {
             logMsg(`🚀 Starting campaign to ${validContacts.length} contacts...`, "sys");
@@ -391,7 +392,7 @@ document.addEventListener('DOMContentLoaded', () => {
             logMsg(`[${i + 1}/${validContacts.length}] Preparing for ${phone}...`, "info");
 
             try {
-                const response = await sendWhatsAppMessage(phone, msg, attachmentBase64, attachmentMimeType, attachmentName);
+                const response = await sendWhatsAppMessage(phone, msg, attachmentBase64, attachmentMimeType, attachmentName, skipExisting);
                 if (response.success) {
                     logMsg(`✅ Sent to ${phone}`, "success");
                     // Mark contact as sent in the scraped data
@@ -453,7 +454,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Connects to background script which will manage the WA Web tab
-    function sendWhatsAppMessage(phone, text, fileBase64, mimeType, fileName) {
+    function sendWhatsAppMessage(phone, text, fileBase64, mimeType, fileName, skipExisting) {
         return new Promise((resolve) => {
             chrome.runtime.sendMessage({
                 action: 'send_whatsapp_message',
@@ -461,7 +462,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 text: text,
                 file: fileBase64,
                 mime: mimeType,
-                filename: fileName
+                filename: fileName,
+                skipExisting: skipExisting
             }, (response) => {
                 if (chrome.runtime.lastError) {
                     resolve({ success: false, error: chrome.runtime.lastError.message });
