@@ -205,42 +205,42 @@ async function waAutomationRunner(data) {
             });
         })(35000);
 
-        // STEP 2: Immediately check for invalid number modal â€” NO sleep, skip right away
+        // STEP 2: Immediately check for invalid number modal
         const dismissBtn = getInvalidNumberModal();
         if (dismissBtn) {
             dismissBtn.click(); // dismiss the OK modal
-            return { success: false, error: "Number isn't on WhatsApp â€” skipped" };
+            return { success: false, error: "Number isn't on WhatsApp - skipped" };
         }
 
         // STEP 2.5: Check for existing chat history if user opted to skip
+        let historyExists = false;
         if (data.skipExisting) {
             // Give WhatsApp chat body a brief moment to render message history (SPA)
-            // Increased delay slightly to ensure SPA has cleared previous chat DOM
             await sleep(2000);
 
             // Refine selector to look for real message bubbles and filter out system banners
             const messages = Array.from(document.querySelectorAll('div.message-in, div.message-out, div[data-id]')).filter(el => {
                 const text = (el.innerText || "").toLowerCase();
                 const id = el.getAttribute('data-id') || "";
-                
-                // 1. Ignore "Messages and calls are end-to-end encrypted" and "Business account" banners
-                if (text.includes("end-to-end encrypted") || 
+
+                if (text.includes("end-to-end encrypted") ||
                     text.includes("messages and calls are end-to-end") ||
                     text.includes("business account") ||
                     text.includes("tap for more info") ||
                     text.includes("no v\u00e1lido")) return false;
-                
-                // 2. Real messages usually have IDs with '@c.us' or '@g.us'
+
                 if (id.includes('@c.us') || id.includes('@g.us')) return true;
-                
-                // 3. Fallback to common message bubble classes
                 if (el.classList.contains('message-in') || el.classList.contains('message-out')) return true;
-                
                 return false;
             });
 
             if (messages.length > 0) {
-                return { success: false, error: "Skipped â€” Chat history already exists." };
+                historyExists = true;
+                // If there's no file to send, we can skip the contact entirely right now
+                if (!data.hasFile) {
+                    return { success: false, error: "Skipped - Chat history already exists." };
+                }
+                console.log("[WA Blast] History exists, but file is present. Skipping text, sending file only.");
             }
         }
 
@@ -262,8 +262,8 @@ async function waAutomationRunner(data) {
             return { success: false, error: 'Chat box not found - WhatsApp may not have loaded the chat.' };
         }
 
-        // STEP 4: Send Text Template FIRST (if provided)
-        if (data.messageText) {
+        // STEP 4: Send Text Template FIRST (if provided and NO check history skip)
+        if (data.messageText && !historyExists) {
             chatBox.click();
             chatBox.focus();
             await sleep(800);
@@ -303,69 +303,104 @@ async function waAutomationRunner(data) {
 
         // STEP 5: Handle file attachment as a SECOND separate message
         if (data.hasFile && data.file) {
+            console.log("[WA Blast] Starting file upload process for:", data.filename);
             const blob = base64ToBlob(data.file.split(',')[1], data.mime);
-            const file = new File([blob], data.filename || 'attachment', { type: data.mime });
+            const file = new File([blob], data.filename || 'attachment', {
+                type: data.mime,
+                lastModified: new Date().getTime()
+            });
             const dt = new DataTransfer();
             dt.items.add(file);
 
-            // 1. Open attachment menu
-            const plusIcon = document.querySelector('span[data-icon="plus-rounded"], span[data-icon="clip"]');
-            if (plusIcon) {
-                const plusBtn = plusIcon.closest('button') || plusIcon.parentElement || plusIcon;
-                plusBtn.click();
-                await sleep(1500);
-            }
+            let uploadSuccess = false;
 
-            // 2. Locate and fill file input
-            let targetInput = null;
-            for (let i = 0; i < 10; i++) {
-                const fileInputs = document.querySelectorAll('input[type="file"]');
-                if (fileInputs.length > 0) {
-                    if (data.mime.startsWith('image/') || data.mime.startsWith('video/')) {
-                        targetInput = Array.from(fileInputs).find(inp => inp.accept && inp.accept.includes('image/'));
-                    } else {
-                        targetInput = Array.from(fileInputs).find(inp => inp.accept === '*' || !inp.accept);
+            // STRATEGY A: Use the Official "Attach" menu (Targeting Document)
+            const plusBtn = document.querySelector('button[aria-label="Attach"], span[data-icon="plus-rounded"], span[data-icon="clip"]');
+            if (plusBtn) {
+                const actualBtn = plusBtn.tagName === 'BUTTON' ? plusBtn : plusBtn.closest('button');
+                if (actualBtn) {
+                    actualBtn.click();
+                    await sleep(2000); // Wait for menu to fully render
+
+                    // Try to click the "Document" icon specifically
+                    const docBtnIcon = document.querySelector('span[data-icon="attach-document"], span[data-icon="document"]');
+                    if (docBtnIcon) {
+                        const docBtn = docBtnIcon.closest('button') || docBtnIcon.closest('li') || docBtnIcon;
+                        docBtn.click();
+                        await sleep(1500);
                     }
-                    if (!targetInput) targetInput = fileInputs[0];
-                    break;
+
+                    // Find the file input (Document path usually creates an input with accept="*" or no accept)
+                    const fileInputs = Array.from(document.querySelectorAll('input[type="file"]'));
+                    let docInput = fileInputs.find(i => i.accept === '*' || !i.accept || i.accept.includes('pdf'));
+
+                    if (docInput) {
+                        console.log("[WA Blast] Setting file to Document input...");
+                        docInput.files = dt.files;
+                        docInput.dispatchEvent(new Event('change', { bubbles: true }));
+                        uploadSuccess = true;
+                    }
                 }
-                await sleep(500);
             }
 
-            if (targetInput) {
-                targetInput.files = dt.files;
-                targetInput.dispatchEvent(new Event('change', { bubbles: true }));
-            } else {
-                // Drag & Drop Fallback
-                const drop = document.querySelector('#main') || document.body;
-                drop.dispatchEvent(new DragEvent('drop', { bubbles: true, dataTransfer: dt }));
+            // STRATEGY B: Drag & Drop Fallback (Targeting the Lexical Editor)
+            if (!uploadSuccess) {
+                console.log("[WA Blast] Attempting Strategy B: Editor Drop...");
+                const editor = document.querySelector('div[contenteditable="true"]') || document.querySelector('.lexical-rich-text-input');
+                if (editor) {
+                    const dropOptions = { bubbles: true, cancelable: true, dataTransfer: dt };
+                    editor.dispatchEvent(new DragEvent('dragenter', dropOptions));
+                    editor.dispatchEvent(new DragEvent('dragover', dropOptions));
+                    await sleep(300);
+                    editor.dispatchEvent(new DragEvent('drop', dropOptions));
+                    uploadSuccess = true;
+                }
             }
 
-            await sleep(3000); // Wait for media preview overlay to appear
+            console.log("[WA Blast] Waiting for PDF processing and preview...");
+            await sleep(8000); // 8 seconds for PDF processing (crucial)
 
-            // 3. Find Media Send Button and click
+            // 3. Find Media Send Button (Specific to the preview overlay)
             let mediaSendBtn = null;
-            for (let i = 0; i < 15; i++) {
-                const svgs = document.querySelectorAll('span[data-icon="wds-ic-send-filled"], span[data-icon="send-light"]');
-                if (svgs.length > 0) {
-                    let icon = svgs[svgs.length - 1];
-                    mediaSendBtn = icon.closest('div[role="button"]') || icon.closest('button') || icon;
-                    break;
+            const mediaSendSelectors = [
+                'div[role="button"][aria-label="Send"]',
+                'button[aria-label="Send"]',
+                'span[data-icon="send"]',
+                'span[data-icon="wds-ic-send-filled"]'
+            ];
+
+            for (let i = 0; i < 20; i++) { // Wait up to 20s for processing
+                for (const sel of mediaSendSelectors) {
+                    const icons = document.querySelectorAll(sel);
+                    if (icons.length > 0) {
+                        // The media overlay send button is always the last one in the DOM
+                        const icon = icons[icons.length - 1];
+                        const btn = icon.closest('div[role="button"]') || icon.closest('button');
+
+                        // Valid check: it should NOT have the plus icon inside it (that's the attach btn)
+                        if (btn && !btn.querySelector('span[data-icon="plus-rounded"]')) {
+                            mediaSendBtn = btn;
+                            break;
+                        }
+                    }
                 }
+                if (mediaSendBtn) break;
                 await sleep(1000);
             }
 
             if (mediaSendBtn) {
-                const evOptsBtn = { bubbles: true, cancelable: true, view: window };
-                mediaSendBtn.dispatchEvent(new MouseEvent('mousedown', evOptsBtn));
-                mediaSendBtn.dispatchEvent(new MouseEvent('mouseup', evOptsBtn));
+                console.log("[WA Blast] Dispatching click to media send button...");
+                const evOpts = { bubbles: true, cancelable: true, view: window };
+                mediaSendBtn.dispatchEvent(new MouseEvent('mousedown', evOpts));
+                mediaSendBtn.dispatchEvent(new MouseEvent('mouseup', evOpts));
                 mediaSendBtn.click();
             } else {
-                console.warn('[WA Blast] Could not find media send button, falling back to Enter...');
-                document.body.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter', keyCode: 13, which: 13 }));
-                document.body.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, cancelable: true, key: 'Enter', keyCode: 13, which: 13 }));
+                console.warn('[WA Blast] Media send button not found. Sending Enter as last resort.');
+                const enterEv = { bubbles: true, cancelable: true, key: 'Enter', keyCode: 13, which: 13 };
+                document.body.dispatchEvent(new KeyboardEvent('keydown', enterEv));
             }
-            await sleep(3500); // Wait for file to actually send before proceeding
+
+            await sleep(5000); // Allow time for actual delivery
         }
 
         await sleep(1000);

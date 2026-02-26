@@ -184,6 +184,20 @@ Full Stack Developer</textarea>
 
                             <div class="composer-attachment">
                                 <h3>Attachment (Optional)</h3>
+
+                                <div class="cv-toggle-card mb-3">
+                                    <div class="toggle-content">
+                                        <div class="toggle-text">
+                                            <h4>Send My CV</h4>
+                                            <p>Automatically attach <code>Muhammad_Tahir_CV.pdf</code></p>
+                                        </div>
+                                        <label class="switch">
+                                            <input type="checkbox" id="send-cv-toggle">
+                                            <span class="slider round"></span>
+                                        </label>
+                                    </div>
+                                </div>
+
                                 <div class="attachment-upload" id="attachment-dropzone">
                                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -191,7 +205,7 @@ Full Stack Developer</textarea>
                                             d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48">
                                         </path>
                                     </svg>
-                                    <span>Attach PDF / Image / Video</span>
+                                    <span>Or Attach Custom File</span>
                                     <input type="file" id="attachment-input" accept=".pdf, image/*, video/*"
                                         style="display: none;">
                                 </div>
@@ -322,6 +336,26 @@ Full Stack Developer</textarea>
                                 <div class="progress-bar-bg massive-bar">
                                     <div id="campaign-progress-fill" class="progress-bar-fill emerald"></div>
                                 </div>
+                                <div class="status-stats-bar"
+                                    style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 15px;">
+                                    <div class="stat-mini-box">
+                                        <span class="mini-label">Processed</span>
+                                        <span class="mini-value" id="stat-total-processed">0/0</span>
+                                    </div>
+                                    <div class="stat-mini-box success">
+                                        <span class="mini-label">Sent</span>
+                                        <span class="mini-value" id="stat-sent-count">0</span>
+                                    </div>
+                                    <div class="stat-mini-box danger">
+                                        <span class="mini-label">Not on WA</span>
+                                        <span class="mini-value" id="stat-invalid-count">0</span>
+                                    </div>
+                                    <div class="stat-mini-box warning">
+                                        <span class="mini-label">Skipped</span>
+                                        <span class="mini-value" id="stat-history-count">0</span>
+                                    </div>
+                                </div>
+
                                 <div class="log-console" id="campaign-logs">
                                     <div class="log-entry sys">System ready. Waiting for Launch...</div>
                                 </div>

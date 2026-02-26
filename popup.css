@@ -101,6 +101,15 @@ h1 span {
     margin-bottom: 12px;
 }
 
+.input-row {
+    display: flex;
+    gap: 12px;
+}
+
+.input-row .input-group {
+    flex: 1;
+}
+
 .label-row {
     display: flex;
     justify-content: space-between;

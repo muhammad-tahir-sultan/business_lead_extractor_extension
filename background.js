@@ -4,6 +4,7 @@ let scrapingState = {
     data: [],
     keyword: '',
     minRating: 0,
+    maxResults: 100,
     progress: 0,
     tabId: null
 };
@@ -88,6 +89,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         scrapingState.isScraping = true;
         scrapingState.keyword = request.keyword;
         scrapingState.minRating = request.minRating;
+        scrapingState.maxResults = request.maxResults || 100;
         scrapingState.data = [];
         scrapingState.status = 'Starting extraction...';
         scrapingState.progress = 0;
@@ -171,4 +173,4 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 // WhatsApp Blast Logic
-try { importScripts("wa_background.js"); } catch(e) { console.error(e); }
+try { importScripts("wa_background.js"); } catch (e) { console.error(e); }

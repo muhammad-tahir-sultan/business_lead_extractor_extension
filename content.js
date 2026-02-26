@@ -24,7 +24,7 @@ if (typeof window.isCancelled === 'undefined') {
         if (request.action === 'start_scraping') {
             window.isCancelled = false;
             window.shouldStop = false;
-            performScraping(request.keyword, request.minRating);
+            performScraping(request.keyword, request.minRating, request.maxResults);
         } else if (request.action === 'cancel_scraping') {
             window.isCancelled = true;
         } else if (request.action === 'stop_scraping') {
@@ -33,7 +33,7 @@ if (typeof window.isCancelled === 'undefined') {
     });
 }
 
-async function performScraping(keyword, minRating) {
+async function performScraping(keyword, minRating, maxResults) {
     if (!isContextValid()) return;
     safeSendMessage({ action: 'status_update', message: 'Inserting keyword...' });
 
@@ -69,23 +69,40 @@ async function performScraping(keyword, minRating) {
     let attempts = 0;
     while (attempts < 5 && !window.isCancelled && isContextValid()) {
         scrollContainer.scrollTo(0, scrollContainer.scrollHeight);
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Fast wait for normal loading
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        let currentCount = document.querySelectorAll('.hfpxzc').length;
+        if (currentCount >= maxResults) {
+            safeSendMessage({ action: 'status_update', message: `Goal reached! (${currentCount} listings found)` });
+            break;
+        }
+
+        // Check if Google Maps explicitly says we've reached the end
+        const feedText = scrollContainer.innerText || "";
+        if (feedText.includes("You've reached the end of the list.")) {
+            safeSendMessage({ action: 'status_update', message: `End of list reached. Found ${currentCount} listings.` });
+            break;
+        }
 
         if (scrollContainer.scrollHeight === lastHeight) {
             attempts++;
+            safeSendMessage({ action: 'status_update', message: `Slow loading... Waiting 20s for more results (Attempt ${attempts}/5)` });
+            // Long wait only when stuck
+            await new Promise(resolve => setTimeout(resolve, 3000));
         } else {
             attempts = 0;
+            safeSendMessage({ action: 'status_update', message: `Scrolling... (${currentCount} listings found)` });
         }
         lastHeight = scrollContainer.scrollHeight;
-        let count = document.querySelectorAll('.hfpxzc').length;
-        safeSendMessage({ action: 'status_update', message: `Scrolling... (${count} listings found)` });
     }
 
     safeSendMessage({ action: 'status_update', message: 'Starting extraction details...' });
 
     let results = [];
     const extractedNames = new Set();
-    const items = Array.from(document.querySelectorAll('.hfpxzc'));
+    const allItems = Array.from(document.querySelectorAll('.hfpxzc'));
+    const items = allItems.slice(0, maxResults);
 
     for (let i = 0; i < items.length; i++) {
         if (window.isCancelled || !isContextValid()) return;

@@ -9,6 +9,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let attachmentBase64 = null;
     let attachmentMimeType = null;
     let attachmentName = null;
+    let cvBase64 = null;
+    let isCvLoaded = false;
+    let campaignStats = { sent: 0, invalid: 0, history: 0, processed: 0 };
 
     // --- Navigation Elements ---
     const steps = [
@@ -445,6 +448,29 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.readAsDataURL(file);
     });
 
+    // --- CV Loading Utility ---
+    async function preloadCV() {
+        if (isCvLoaded) return cvBase64;
+        try {
+            const url = chrome.runtime.getURL('Muhammad_Tahir_CV.pdf');
+            const response = await fetch(url);
+            const blob = await response.blob();
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    cvBase64 = reader.result;
+                    isCvLoaded = true;
+                    resolve(cvBase64);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        } catch (err) {
+            console.error("Failed to preload CV:", err);
+            return null;
+        }
+    }
+
     document.getElementById('remove-attachment-btn').addEventListener('click', () => {
         attachmentBase64 = null;
         attachmentMimeType = null;
@@ -516,13 +542,30 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    document.getElementById('launch-campaign-btn').addEventListener('click', () => {
-        if (!msgBox.value.trim() && !attachmentBase64) {
-            alert("Please provide a message or an attachment to send.");
+    document.getElementById('launch-campaign-btn').addEventListener('click', async () => {
+        const sendCv = document.getElementById('send-cv-toggle').checked;
+        if (!msgBox.value.trim() && !attachmentBase64 && !sendCv) {
+            alert("Please provide a message, an attachment, or enable 'Send My CV'.");
             goToStep(2);
             return;
         }
+
+        if (sendCv && !isCvLoaded) {
+            const statusBadge = document.getElementById('leads-count-badge');
+            const originalText = statusBadge.innerText;
+            statusBadge.innerText = 'Loading CV...';
+            await preloadCV();
+            statusBadge.innerText = originalText;
+
+            if (!cvBase64) {
+                alert("Could not load 'Muhammad_Tahir_CV.pdf' from extension directory. Please ensure the file exists.");
+                return;
+            }
+        }
+
         campaignStartIndex = 0;
+        campaignStats = { sent: 0, invalid: 0, history: 0, processed: 0 };
+        updateStatsUI();
         startCampaign(0);
     });
 
@@ -531,24 +574,26 @@ document.addEventListener('DOMContentLoaded', () => {
         logMsg("⏹ Stop requested — finishing current message then halting...", "error");
     });
 
-    document.getElementById('resume-campaign-btn').addEventListener('click', () => {
-        if (!msgBox.value.trim() && !attachmentBase64) {
-            alert("Please provide a message or an attachment to send.");
-            return;
-        }
+    document.getElementById('resume-campaign-btn').addEventListener('click', async () => {
         logMsg(`▶ Resuming from contact ${campaignStartIndex + 1} of ${validContacts.length}...`, "sys");
+        const sendCv = document.getElementById('send-cv-toggle').checked;
+        if (sendCv && !isCvLoaded) {
+            await preloadCV();
+        }
+        updateStatsUI();
         startCampaign(campaignStartIndex);
     });
 
-    document.getElementById('restart-campaign-btn').addEventListener('click', () => {
-        if (!msgBox.value.trim() && !attachmentBase64) {
-            alert("Please provide a message or an attachment to send.");
-            return;
-        }
+    document.getElementById('restart-campaign-btn').addEventListener('click', async () => {
         // Clear logs and progress bar
         document.getElementById('campaign-logs').innerHTML = '<div class="log-entry sys">Restarting campaign from the beginning...</div>';
         document.getElementById('campaign-progress-fill').style.width = '0%';
         document.getElementById('progress-percent').innerText = '0%';
+
+        const sendCv = document.getElementById('send-cv-toggle').checked;
+        if (sendCv && !isCvLoaded) {
+            await preloadCV();
+        }
         startCampaign(0);
     });
 
@@ -556,6 +601,7 @@ document.addEventListener('DOMContentLoaded', () => {
         showCampaignState('running');
         isCampaignRunning = true;
         shouldStopCampaign = false;
+        updateStatsUI();
 
         const template = msgBox.value;
         const delayBase = parseInt(delaySlider.value);
@@ -563,6 +609,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const pauseBatch = document.getElementById('pause-batch').checked;
         const batchSize = parseInt(document.getElementById('batch-size').value);
         const skipExisting = document.getElementById('skip-existing').checked;
+        const sendCv = document.getElementById('send-cv-toggle').checked;
+
+        if (sendCv && !isCvLoaded) {
+            await preloadCV();
+        }
 
         if (fromIndex === 0) {
             logMsg(`🚀 Starting campaign to ${validContacts.length} contacts...`, "sys");
@@ -580,29 +631,76 @@ document.addEventListener('DOMContentLoaded', () => {
             const item = validContacts[i];
             const phone = item._processedPhone;
 
-            // Build personalized message
+            // Determine what to send
+            const sendCv = document.getElementById('send-cv-toggle').checked;
+            let currentPayload = {
+                phone: phone,
+                text: '',
+                file: null,
+                mime: null,
+                filename: null
+            };
+
+            // 1. Handle Text
             let msg = template;
-            Object.keys(item).forEach(k => {
-                if (k !== '_processedPhone') {
-                    const regex = new RegExp(`{{${k}}}`, 'gi');
-                    msg = msg.replace(regex, item[k] || '');
-                }
-            });
+            if (msg.trim()) {
+                Object.keys(item).forEach(k => {
+                    if (k !== '_processedPhone') {
+                        const regex = new RegExp(`{{${k}}}`, 'gi');
+                        msg = msg.replace(regex, item[k] || '');
+                    }
+                });
+                currentPayload.text = msg;
+            }
+
+            // 2. Handle Attachment (Priority: Custom Upload > CV Toggle)
+            if (attachmentBase64) {
+                currentPayload.file = attachmentBase64;
+                currentPayload.mime = attachmentMimeType;
+                currentPayload.filename = attachmentName;
+            } else if (sendCv && cvBase64) {
+                currentPayload.file = cvBase64;
+                currentPayload.mime = 'application/pdf';
+                currentPayload.filename = 'Muhammad_Tahir_CV.pdf';
+            }
 
             logMsg(`[${i + 1}/${validContacts.length}] Preparing for ${phone}...`, "info");
+            if (currentPayload.file) {
+                logMsg(`📎 Attaching: ${currentPayload.filename}...`, "sys");
+            }
 
             try {
-                const response = await sendWhatsAppMessage(phone, msg, attachmentBase64, attachmentMimeType, attachmentName, skipExisting);
+                const response = await sendWhatsAppMessage(
+                    currentPayload.phone,
+                    currentPayload.text,
+                    currentPayload.file,
+                    currentPayload.mime,
+                    currentPayload.filename,
+                    skipExisting
+                );
                 if (response.success) {
-                    logMsg(`✅ Sent to ${phone}`, "success");
+                    let successTxt = `✅ Sent to ${phone}`;
+                    if (currentPayload.file) {
+                        successTxt += ` (including ${currentPayload.filename})`;
+                    }
+                    logMsg(successTxt, "success");
+                    campaignStats.sent++;
                     // Mark contact as sent in the scraped data
                     chrome.runtime.sendMessage({
                         action: 'update_wa_sent_status',
                         phone: phone
                     });
                 } else {
+                    const error = response.error || '';
+                    if (error.includes("isn't on WhatsApp")) {
+                        campaignStats.invalid++;
+                    } else if (error.includes("already exists")) {
+                        campaignStats.history++;
+                    }
                     logMsg(`❌ Failed for ${phone}: ${response.error}`, "error");
                 }
+                campaignStats.processed++;
+                updateStatsUI();
             } catch (err) {
                 logMsg(`⚠️ Error for ${phone}: ${err}`, "error");
             }
@@ -651,6 +749,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function sleep(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function updateStatsUI() {
+        document.getElementById('stat-total-processed').innerText = `${campaignStats.processed}/${validContacts.length}`;
+        document.getElementById('stat-sent-count').innerText = campaignStats.sent;
+        document.getElementById('stat-invalid-count').innerText = campaignStats.invalid;
+        document.getElementById('stat-history-count').innerText = campaignStats.history;
     }
 
     // Connects to background script which will manage the WA Web tab

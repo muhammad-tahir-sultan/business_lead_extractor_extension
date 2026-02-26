@@ -123,18 +123,34 @@
                 </div>
             </div>
 
-            <div class="input-group">
-                <label for="min-rating">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <polygon
-                            points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2">
-                        </polygon>
-                    </svg>
-                    Minimum Rating
-                </label>
-                <div class="input-wrapper">
-                    <input type="number" id="min-rating" value="0" min="0" max="5" step="0.5">
+            <div class="input-row">
+                <div class="input-group">
+                    <label for="max-results">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M23 4v6h-6"></path>
+                            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                        </svg>
+                        Max Results
+                    </label>
+                    <div class="input-wrapper">
+                        <input type="number" id="max-results" value="100" min="1" max="500">
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="min-rating">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polygon
+                                points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2">
+                            </polygon>
+                        </svg>
+                        Min Rating
+                    </label>
+                    <div class="input-wrapper">
+                        <input type="number" id="min-rating" value="0" min="0" max="5" step="0.5">
+                    </div>
                 </div>
             </div>
 

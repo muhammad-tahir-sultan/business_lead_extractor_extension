@@ -737,6 +737,7 @@ function updateUI(state) {
         document.getElementById('keyword').value = state.keyword;
     }
     if (state.minRating) document.getElementById('min-rating').value = state.minRating;
+    if (state.maxResults) document.getElementById('max-results').value = state.maxResults;
 
     // Enable export buttons if data exists
     const hasData = scrapedData.length > 0;
@@ -758,6 +759,7 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     const suggestionsList = document.getElementById('suggestions-list');
     const keyword = keywordInput.value;
     const minRating = parseFloat(document.getElementById('min-rating').value) || 0;
+    const maxResults = parseInt(document.getElementById('max-results').value) || 100;
 
     if (!keyword) {
         alert("Please enter a keyword.");
@@ -779,6 +781,7 @@ document.getElementById('start-btn').addEventListener('click', async () => {
         action: 'start_scraping',
         keyword: keyword,
         minRating: minRating,
+        maxResults: maxResults,
         tabId: tab.id
     });
 
@@ -789,7 +792,8 @@ document.getElementById('start-btn').addEventListener('click', async () => {
         chrome.tabs.sendMessage(tab.id, {
             action: 'start_scraping',
             keyword: keyword,
-            minRating: minRating
+            minRating: minRating,
+            maxResults: maxResults
         }).catch((err) => {
             console.log("Could not start scraping in tab", err);
         });
