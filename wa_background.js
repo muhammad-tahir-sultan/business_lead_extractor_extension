@@ -215,13 +215,30 @@ async function waAutomationRunner(data) {
         // STEP 2.5: Check for existing chat history if user opted to skip
         if (data.skipExisting) {
             // Give WhatsApp chat body a brief moment to render message history (SPA)
-            await sleep(1500);
+            // Increased delay slightly to ensure SPA has cleared previous chat DOM
+            await sleep(2000);
 
-            // WA Web uses `message-in` (incoming) and `message-out` (outgoing) classes,
-            // or role="row" for message containers.
-            const messages = document.querySelectorAll('div.message-in, div.message-out, div[role="row"] div[data-id]');
+            // Refine selector to look for real message bubbles and filter out system banners
+            const messages = Array.from(document.querySelectorAll('div.message-in, div.message-out, div[data-id]')).filter(el => {
+                const text = (el.innerText || "").toLowerCase();
+                const id = el.getAttribute('data-id') || "";
+                
+                // 1. Ignore "Messages and calls are end-to-end encrypted" and "Business account" banners
+                if (text.includes("end-to-end encrypted") || 
+                    text.includes("messages and calls are end-to-end") ||
+                    text.includes("business account") ||
+                    text.includes("tap for more info") ||
+                    text.includes("no v\u00e1lido")) return false;
+                
+                // 2. Real messages usually have IDs with '@c.us' or '@g.us'
+                if (id.includes('@c.us') || id.includes('@g.us')) return true;
+                
+                // 3. Fallback to common message bubble classes
+                if (el.classList.contains('message-in') || el.classList.contains('message-out')) return true;
+                
+                return false;
+            });
 
-            // Only count if there's actual chat text, ignoring system messages like "encryption" alerts
             if (messages.length > 0) {
                 return { success: false, error: "Skipped â€” Chat history already exists." };
             }
