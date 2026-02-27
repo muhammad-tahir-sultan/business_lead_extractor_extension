@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     LocationBuilder.init();
     SheetAppend.init();
     SheetViewer.init();
+    AutoSave.init();
 
     // Restore UI from background worker state
     chrome.runtime.sendMessage({ action: 'get_status' }, (state) => {
@@ -13,8 +14,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Live updates from background while popup is open
+    let _wasScraping = false;
     chrome.runtime.onMessage.addListener((req) => {
-        if (req.action === 'ui_update') UI.updateFromState(req.state);
+        if (req.action !== 'ui_update') return;
+        const state = req.state;
+
+        // Detect transition: scraping → done  → trigger auto-save
+        if (_wasScraping && !state.isScraping && state.data && state.data.length) {
+            AutoSave.execute(state.data);
+        }
+        _wasScraping = Boolean(state.isScraping);
+
+        UI.updateFromState(state);
     });
 
     // ── Button wiring ─────────────────────────────────────────────────────────

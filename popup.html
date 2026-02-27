@@ -187,6 +187,51 @@
                 </div>
             </div>
 
+            <!-- ── Auto-Save Toggle ──────────────────────────────────────────── -->
+            <div class="auto-save-bar">
+                <div class="auto-save-header">
+                    <div class="auto-save-label">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                            <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                            <polyline points="7 3 7 8 15 8"></polyline>
+                        </svg>
+                        <span>Auto-save to Sheet</span>
+                        <span id="auto-save-indicator" class="auto-save-indicator"></span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="auto-save-toggle">
+                        <span class="toggle-track">
+                            <span class="toggle-thumb"></span>
+                        </span>
+                    </label>
+                </div>
+
+                <!-- Sub-options (shown when toggle is ON) -->
+                <div id="auto-save-options" class="auto-save-options" style="display:none;">
+                    <div class="auto-save-modes">
+                        <label class="mode-option">
+                            <input type="radio" name="auto-save-mode" value="append" checked>
+                            <span class="mode-pill">Append to sheet</span>
+                        </label>
+                        <label class="mode-option">
+                            <input type="radio" name="auto-save-mode" value="new">
+                            <span class="mode-pill">New tab</span>
+                        </label>
+                    </div>
+                    <div id="auto-save-sheet-row" class="auto-save-sheet-row">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="rgba(165,180,252,0.6)"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                        <select id="auto-save-sheet-select" class="auto-save-select">
+                            <option value="">— select sheet tab —</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
             <!-- Status Section (inside the card for visual consistency) -->
             <div id="status-container" class="status-container">
                 <div class="progress-wrapper" id="progress-wrapper" style="display: none;">
@@ -442,6 +487,7 @@
     <script src="js/location.js"></script>
     <script src="js/sheet-viewer.js"></script>
     <script src="js/sheet-append.js"></script>
+    <script src="js/auto-save.js"></script>
     <script src="js/main.js"></script>
 </body>
 
