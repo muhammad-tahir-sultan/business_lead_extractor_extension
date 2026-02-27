@@ -93,7 +93,15 @@ h1 span {
     border-radius: 16px;
     padding: 14px 18px;
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+    flex: 1;
+    /* fill remaining height of glass-container */
+    overflow-y: auto;
+    /* scroll internally if content overflows */
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
+
 
 .input-group {
     margin-bottom: 12px;

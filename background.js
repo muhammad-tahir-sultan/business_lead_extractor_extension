@@ -6,8 +6,13 @@ let scrapingState = {
     minRating: 0,
     maxResults: 100,
     progress: 0,
-    tabId: null
+    tabId: null,
+    startTime: null,   // epoch ms when scraping began
+    itemsTotal: 0,      // total items in this run (set from progress msgs)
+    elapsed: 0,      // seconds elapsed
+    eta: null,   // seconds remaining (null = unknown)
 };
+
 
 // Load state from storage on startup
 chrome.storage.local.get(['savedScrapingState'], (result) => {
@@ -94,27 +99,55 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         scrapingState.status = 'Starting extraction...';
         scrapingState.progress = 0;
         scrapingState.tabId = request.tabId;
+        scrapingState.startTime = Date.now();
+        scrapingState.itemsTotal = 0;
+        scrapingState.elapsed = 0;
+        scrapingState.eta = null;
         saveState();
     }
 
+
     if (request.action === 'status_update') {
         scrapingState.status = request.message;
+
         if (request.progress !== undefined) {
             scrapingState.progress = request.progress;
         }
+
+        // Compute elapsed and ETA
+        if (scrapingState.startTime) {
+            const elapsedMs = Date.now() - scrapingState.startTime;
+            scrapingState.elapsed = Math.floor(elapsedMs / 1000);
+
+            const pct = scrapingState.progress;
+            scrapingState.eta = (pct > 2)
+                ? Math.round((elapsedMs / pct) * (100 - pct) / 1000)
+                : null;
+        }
+
         // Broadcast to popup if open
         chrome.runtime.sendMessage({ action: 'ui_update', state: scrapingState }).catch(() => { });
         saveState();
     }
+
 
     if (request.action === 'scraping_complete') {
         scrapingState.isScraping = false;
         scrapingState.data = request.data;
-        scrapingState.status = `Done! Grabbed ${request.data.length} records.`;
+
+        const s = request.stats || {};
+        const n = s.total ?? request.data.length;
+        scrapingState.status = n === 0
+            ? 'Done! No records found.'
+            : `✅ Done! ${n} scraped`
+            + `  ·  📞 ${s.phone ?? '?'}/${n}`
+            + `  ·  🌐 ${s.web ?? '?'}/${n}`
+            + `  ·  📧 ${s.email ?? '?'}/${n}`;
+
         saveState();
-        // Broadcast to popup if open
         chrome.runtime.sendMessage({ action: 'ui_update', state: scrapingState }).catch(() => { });
     }
+
 
     if (request.action === 'stop_scraping') {
         if (scrapingState.tabId) {

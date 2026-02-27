@@ -44,17 +44,28 @@ const SheetViewer = (() => {
             return;
         }
 
-        el('view-sheet-tbody').innerHTML = rows.map((row, i) => {
+        const tbody = el('view-sheet-tbody');
+        tbody.innerHTML = rows.map((row, i) => {
             const bg = i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent';
             const cells = _headers.map((h) =>
                 `<td style="padding:9px 16px;border-bottom:1px solid rgba(255,255,255,0.04);white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis;">
                     ${cellContent(row[h] || '')}
                 </td>`
             ).join('');
-            return `<tr style="background:${bg};transition:background .15s;"
-                        onmouseover="this.style.background='rgba(99,102,241,0.08)'"
-                        onmouseout="this.style.background='${bg}'">${cells}</tr>`;
+            // data-bg stored so the mouseout handler can restore the correct stripe colour
+            return `<tr class="sv-row" data-bg="${bg}" style="background:${bg};transition:background .15s;">${cells}</tr>`;
         }).join('');
+
+        // ── Hover via event delegation (no inline handlers → CSP-safe) ──────────
+        tbody.onmouseover = (e) => {
+            const tr = e.target.closest('tr.sv-row');
+            if (tr) tr.style.background = 'rgba(99,102,241,0.08)';
+        };
+        tbody.onmouseout = (e) => {
+            const tr = e.target.closest('tr.sv-row');
+            if (tr) tr.style.background = tr.dataset.bg;
+        };
+
     }
 
     function renderTable(rows) {

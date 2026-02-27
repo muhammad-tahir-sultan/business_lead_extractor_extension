@@ -6,6 +6,16 @@ const EXPORT_BUTTON_IDS = [
     'clear-results-btn', 'whatsapp-blast-btn',
 ];
 
+function formatDuration(seconds) {
+    if (!seconds || seconds < 0) return '—';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (h > 0) return `${h}h ${m}m`;
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
+}
+
 const UI = {
     el: (id) => document.getElementById(id),
 
@@ -31,6 +41,16 @@ const UI = {
             const pct = state.progress || 0;
             this.el('progress-bar-fill').style.width = `${pct}%`;
             this.el('progress-stats').innerText = `${pct}% complete`;
+
+            // Elapsed & ETA
+            const elapsedEl = this.el('elapsed-time');
+            const etaEl = this.el('eta-time');
+            if (elapsedEl) elapsedEl.innerText = `Elapsed: ${formatDuration(state.elapsed || 0)}`;
+            if (etaEl) {
+                etaEl.innerText = (state.eta != null)
+                    ? `ETA: ~${formatDuration(state.eta)}`
+                    : 'ETA: calculating…';
+            }
         }
 
         if (state.keyword && !this.el('keyword').value) this.el('keyword').value = state.keyword;

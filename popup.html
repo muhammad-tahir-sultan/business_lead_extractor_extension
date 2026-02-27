@@ -186,98 +186,106 @@
                     </button>
                 </div>
             </div>
-        </div>
 
-        <!-- Status Section -->
-        <div id="status-container" class="status-container">
-            <div class="progress-wrapper" id="progress-wrapper" style="display: none;">
-                <div class="progress-bar-bg">
-                    <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%"></div>
+            <!-- Status Section (inside the card for visual consistency) -->
+            <div id="status-container" class="status-container">
+                <div class="progress-wrapper" id="progress-wrapper" style="display: none;">
+                    <div class="progress-bar-bg">
+                        <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%"></div>
+                    </div>
+                    <!-- Timing row -->
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+                        <span id="elapsed-time"
+                            style="font-size:11px; color:rgba(255,255,255,0.45); font-weight:500;">Elapsed: 0s</span>
+                        <span id="eta-time"
+                            style="font-size:11px; color:rgba(165,180,252,0.7); font-weight:600;"></span>
+                        <div id="progress-stats" class="progress-stats">0% complete</div>
+                    </div>
                 </div>
-                <div id="progress-stats" class="progress-stats">0% complete</div>
-            </div>
-            <div id="status" class="status-text">Ready to extract premium leads...</div>
-        </div>
-
-        <!-- Export Section -->
-        <div class="export-area">
-            <h3 class="section-title">Export Results</h3>
-            <div class="export-grid">
-                <button id="export-csv-btn" class="export-btn" disabled>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
-                    CSV
-                </button>
-                <button id="export-excel-btn" class="export-btn" disabled>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
-                    Excel
-                </button>
-                <button id="append-sheet-btn" class="export-btn" disabled>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                        <line x1="16" y1="13" x2="8" y2="13"></line>
-                        <line x1="16" y1="17" x2="8" y2="17"></line>
-                    </svg>
-                    Append
-                </button>
-                <button id="new-sheet-btn" class="export-btn" disabled>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                        <line x1="12" y1="18" x2="12" y2="12"></line>
-                        <line x1="9" y1="15" x2="15" y2="15"></line>
-                    </svg>
-                    New Tab
-                </button>
-                <button id="view-sheet-btn" class="export-btn" style="grid-column: 1 / -1;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                        <line x1="8" y1="13" x2="16" y2="13"></line>
-                        <line x1="8" y1="17" x2="16" y2="17"></line>
-                    </svg>
-                    View Sheet Data
-                </button>
+                <div id="status" class="status-text">Ready to extract premium leads...</div>
             </div>
 
-            <button id="whatsapp-blast-btn" class="whatsapp-btn" style="margin-top: 8px;" disabled>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                    stroke-linecap="round" stroke-linejoin="round">
-                    <path
-                        d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z">
-                    </path>
-                </svg>
-                WhatsApp Blast
-            </button>
+            <!-- Export Section -->
+            <div class="export-area">
+                <h3 class="section-title">Export Results</h3>
+                <div class="export-grid">
+                    <button id="export-csv-btn" class="export-btn" disabled>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        CSV
+                    </button>
+                    <button id="export-excel-btn" class="export-btn" disabled>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        Excel
+                    </button>
+                    <button id="append-sheet-btn" class="export-btn" disabled>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                        </svg>
+                        Append
+                    </button>
+                    <button id="new-sheet-btn" class="export-btn" disabled>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="12" y1="18" x2="12" y2="12"></line>
+                            <line x1="9" y1="15" x2="15" y2="15"></line>
+                        </svg>
+                        New Tab
+                    </button>
+                    <button id="view-sheet-btn" class="export-btn" style="grid-column: 1 / -1;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="8" y1="13" x2="16" y2="13"></line>
+                            <line x1="8" y1="17" x2="16" y2="17"></line>
+                        </svg>
+                        View Sheet Data
+                    </button>
+                </div>
 
-            <div class="secondary-actions" style="margin-top: 12px; display: flex; justify-content: flex-end;">
-                <button id="clear-results-btn" class="text-btn danger" disabled
-                    style="font-size: 11px; opacity: 0.7; display: flex; align-items: center; gap: 4px; background: none; border: none; color: #ef4444; cursor: pointer; padding: 4px 8px; border-radius: 4px;">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                <button id="whatsapp-blast-btn" class="whatsapp-btn" style="margin-top: 8px;" disabled>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="3 6 5 6 21 6"></polyline>
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2">
+                        <path
+                            d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z">
                         </path>
                     </svg>
-                    Clear Results
+                    WhatsApp Blast
                 </button>
-            </div>
-        </div>
 
-        <!-- Sheet Selector Modal (Append) -->
+                <div class="secondary-actions" style="margin-top: 12px; display: flex; justify-content: flex-end;">
+                    <button id="clear-results-btn" class="text-btn danger" disabled
+                        style="font-size: 11px; opacity: 0.7; display: flex; align-items: center; gap: 4px; background: none; border: none; color: #ef4444; cursor: pointer; padding: 4px 8px; border-radius: 4px;">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2">
+                            </path>
+                        </svg>
+                        Clear Results
+                    </button>
+                </div>
+            </div>
+        </div><!-- /.card -->
+
+        <!-- Modals are positioned fixed/absolute — outside the card -->
+
         <div id="sheet-selector-modal" class="library-view" style="display: none; padding: 24px; z-index: 3000;">
             <div class="library-header" style="margin-bottom: 20px;">
                 <h2 style="font-size: 16px; margin: 0; color: white;">Select Sheet to Append</h2>

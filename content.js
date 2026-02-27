@@ -104,6 +104,15 @@ async function performScraping(keyword, minRating, maxResults) {
     const allItems = Array.from(document.querySelectorAll('.hfpxzc'));
     const items = allItems.slice(0, maxResults);
 
+    // ── Stats counters ──────────────────────────────────────────────────────
+    let statPhone = 0, statWeb = 0, statEmail = 0;
+
+    // ── Builds the live per-business status line ────────────────────────────
+    function statusLine(idx, total, name, parts) {
+        const label = name.length > 32 ? name.slice(0, 32) + '…' : name;
+        return `[${idx}/${total}] ${label}` + (parts.length ? '  ' + parts.join('  ') : '');
+    }
+
     for (let i = 0; i < items.length; i++) {
         if (window.isCancelled || !isContextValid()) return;
         if (window.shouldStop) {
@@ -114,7 +123,9 @@ async function performScraping(keyword, minRating, maxResults) {
         let item = items[i];
         let progress = Math.round(((i + 1) / items.length) * 100);
 
-        let name = item.getAttribute('aria-label') || '';
+        // aria-label sometimes contains "· Visited link" or "· Open in Google Maps" etc.
+        let name = (item.getAttribute('aria-label') || '').replace(/\s*·\s*(Visited link|Open in Google Maps|.*link)$/i, '').trim();
+
 
         // Find rating node relative to this item
         let parent = item.closest('.Nv2PK') || item.parentElement.parentElement;
@@ -142,82 +153,193 @@ async function performScraping(keyword, minRating, maxResults) {
 
         safeSendMessage({
             action: 'status_update',
-            message: `Extracting ${i + 1}/${items.length}: ${name}`,
-            progress: progress
+            message: statusLine(i + 1, items.length, name, []),
+            progress
         });
 
-        // Click to open side panel to get website/phone
+        // Snapshot the current panel heading so we can detect when it changes
+        const prevH1 = (document.querySelector('h1') || {}).innerText || '';
+
         item.click();
 
-        for (let j = 0; j < 3; j++) {
+        // Poll until the panel h1 changes — this is our reliable "panel loaded" signal
+        // (avoids name-matching which breaks when aria-label ≠ panel heading)
+        let panelReady = false;
+        for (let wait = 0; wait < 30; wait++) {
             if (window.isCancelled || !isContextValid()) break;
-            await new Promise(resolve => setTimeout(resolve, 1000));
-        }
+            await new Promise(resolve => setTimeout(resolve, 300));
 
-        let phone = '';
-        let website = '';
-
-        let webButton = document.querySelector('a[data-item-id="authority"]');
-        if (webButton) {
-            website = webButton.href;
-        }
-
-        let phoneButtons = document.querySelectorAll('button[data-tooltip^="Copy phone number"], button[data-item-id^="phone:"]');
-        if (phoneButtons.length > 0) {
-            phone = phoneButtons[0].getAttribute('aria-label') || phoneButtons[0].innerText || '';
-            phone = phone.replace('Phone: ', '').replace('Copy phone number', '').trim();
-        }
-
-        // If no phone or website found on panel, fall back to checking if the card text has something looking like a website
-        if (!website) {
-            let infoText = parent.innerText || '';
-            if (infoText.includes('.com') || infoText.includes('.co.uk') || infoText.includes('.org') || infoText.includes('.net')) {
-                website = "(Contains URL in title/card)";
+            const curH1 = (document.querySelector('h1') || {}).innerText || '';
+            if (curH1.trim() && curH1.trim() !== prevH1.trim()) {
+                // Give the rest of the panel (phone row, website row) one extra tick
+                await new Promise(resolve => setTimeout(resolve, 400));
+                panelReady = true;
+                break;
             }
         }
 
-        // If we found a website, ask the background script to do a deep scrape
-        let emails = "";
-        let facebook = "";
-        let linkedin = "";
+        // Fallback: if h1 never changed (same business, or no h1 at all), hard-wait
+        if (!panelReady) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            panelReady = true;   // attempt read anyway
+        }
+
+        // Always start fresh — never carry over from the previous business
+        let phone = '';
+        let website = '';
+        const liveParts = [];   // accumulates emoji badges shown in real-time
+
+        if (panelReady) {
+            // ── Phone ──────────────────────────────────────────────────────────
+            safeSendMessage({
+                action: 'status_update',
+                message: statusLine(i + 1, items.length, name, ['📞 reading…']),
+                progress
+            });
+
+            // Strategy A: button with copy tooltip (legacy Maps UI)
+            const phoneBtn = document.querySelector(
+                'button[data-tooltip^="Copy phone number"], button[data-item-id^="phone:"]'
+            );
+            if (phoneBtn) {
+                phone = (phoneBtn.getAttribute('aria-label') || phoneBtn.innerText || '')
+                    .replace('Phone: ', '').replace('Copy phone number', '').trim();
+            }
+
+            // Strategy B: div-based info rows (current Maps UI — class Io6YTe fdkmkc)
+            if (!phone) {
+                const PHONE_RE = /^\+?[\d\s\-\(\)\.]{7,20}$/;
+                for (const div of document.querySelectorAll('div.Io6YTe.fdkmkc')) {
+                    const text = div.innerText.trim();
+                    if (PHONE_RE.test(text)) { phone = text; break; }
+                }
+            }
+
+            liveParts.push(phone ? `📞 ${phone}` : '📞 —');
+            safeSendMessage({
+                action: 'status_update',
+                message: statusLine(i + 1, items.length, name, liveParts),
+                progress
+            });
+
+            // ── Website ────────────────────────────────────────────────────────
+            liveParts.push('🌐 reading…');
+            safeSendMessage({
+                action: 'status_update',
+                message: statusLine(i + 1, items.length, name, liveParts),
+                progress
+            });
+
+            // Strategy A: anchor with authority data-item-id (legacy Maps UI)
+            const webAnchor = document.querySelector('a[data-item-id="authority"]');
+            if (webAnchor) website = webAnchor.href;
+
+            // Strategy B: rogA2c ITvuef row = website row in current Maps UI
+            if (!website) {
+                const webDiv = document.querySelector(
+                    'div.rogA2c.ITvuef div.Io6YTe.fdkmkc, div.rogA2c.ITvuef div.fontBodyMedium'
+                );
+                if (webDiv) {
+                    const text = webDiv.innerText.trim();
+                    if (/^[a-zA-Z0-9][a-zA-Z0-9\-.]*\.[a-zA-Z]{2,}/.test(text)) {
+                        website = text.startsWith('http') ? text : `https://${text}`;
+                    }
+                }
+            }
+
+            // Strategy C: scan all info divs for a domain-pattern (last resort)
+            if (!website) {
+                const DOMAIN_RE = /^[a-zA-Z0-9][a-zA-Z0-9\-.]*\.[a-zA-Z]{2,}/;
+                const NOT_PHONE = /^\+?[\d\s\-\(\)\.]+$/;
+                for (const div of document.querySelectorAll('div.Io6YTe.fdkmkc')) {
+                    const text = div.innerText.trim();
+                    if (DOMAIN_RE.test(text) && !NOT_PHONE.test(text)) {
+                        website = text.startsWith('http') ? text : `https://${text}`;
+                        break;
+                    }
+                }
+            }
+
+            // Replace the placeholder with the result
+            liveParts[liveParts.length - 1] = website
+                ? `🌐 ${website.replace(/^https?:\/\//, '').slice(0, 20)}`
+                : '🌐 —';
+            safeSendMessage({
+                action: 'status_update',
+                message: statusLine(i + 1, items.length, name, liveParts),
+                progress
+            });
+        }
+
+        // Fallback card-text URL hint
+        if (!website) {
+            const cardText = parent.innerText || '';
+            const hasUrl = ['.com', '.co.uk', '.org', '.net', '.io', '.pk'].some(ext => cardText.includes(ext));
+            if (hasUrl) website = '(Contains URL in title/card)';
+        }
+
+        // ── Deep-scrape website for email / social links ───────────────────────
+        let emails = '';
+        let facebook = '';
+        let linkedin = '';
 
         if (!window.isCancelled && isContextValid() && website && website.startsWith('http')) {
-            safeSendMessage({ action: 'status_update', message: `Deep scraping website for ${name}...` });
+            liveParts.push('📧 scraping…');
+            safeSendMessage({
+                action: 'status_update',
+                message: statusLine(i + 1, items.length, name, liveParts),
+                progress
+            });
+
             try {
                 const deepData = await new Promise((resolve) => {
-                    if (!isContextValid()) {
-                        resolve({ emails: '', facebook: '', linkedin: '' });
-                        return;
-                    }
+                    if (!isContextValid()) { resolve({ emails: '', facebook: '', linkedin: '' }); return; }
                     chrome.runtime.sendMessage({ action: 'scrape_website', url: website }, (response) => {
-                        if (chrome.runtime.lastError) {
-                            resolve({ emails: '', facebook: '', linkedin: '' });
-                        } else {
-                            resolve(response || { emails: '', facebook: '', linkedin: '' });
-                        }
+                        if (chrome.runtime.lastError) resolve({ emails: '', facebook: '', linkedin: '' });
+                        else resolve(response || { emails: '', facebook: '', linkedin: '' });
                     });
                 });
                 emails = deepData.emails;
                 facebook = deepData.facebook;
                 linkedin = deepData.linkedin;
             } catch (e) { }
+
+            // Replace placeholder with result
+            liveParts[liveParts.length - 1] = emails
+                ? `📧 ${emails.split(',')[0].trim().slice(0, 22)}`
+                : '📧 —';
         }
 
+        // ── Update stats ───────────────────────────────────────────────────────
+        if (phone) statPhone++;
+        if (website && !website.startsWith('(')) statWeb++;
+        if (emails) statEmail++;
+
+        // ── Final per-business confirmation ────────────────────────────────────
+        safeSendMessage({
+            action: 'status_update',
+            message: statusLine(i + 1, items.length, name, liveParts) + '  ✓',
+            progress
+        });
+
         results.push({
-            name: name,
-            rating: rating,
-            reviews: reviews,
+            name,
+            rating,
+            reviews,
             url: mapUrl,
             contact: phone,
-            website: website,
-            emails: emails,
-            facebook: facebook,
-            linkedin: linkedin
+            website,
+            emails,
+            facebook,
+            linkedin,
         });
     }
 
+    // ── Final stats summary ────────────────────────────────────────────────────
+    const n = results.length;
     safeSendMessage({
         action: 'scraping_complete',
-        data: results
+        data: results,
+        stats: { total: n, phone: statPhone, web: statWeb, email: statEmail }
     });
 }
