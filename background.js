@@ -87,7 +87,8 @@ async function executeAutoSaveInBackground(data, keyword) {
 
         if (result.status !== 'success') throw new Error(result.message);
 
-        scrapingState.status = `✅ Auto-saved! ${rows.length} rows → ${result.url || 'Sheet'}`;
+        const linkText = result.url ? `<a href="${result.url}" target="_blank" style="color:#6366f1;">Open Sheet ↗</a>` : 'Sheet';
+        scrapingState.status = `✅ Auto-saved! ${rows.length} rows → ${linkText}`;
     } catch (err) {
         console.error('Background Auto-save failed:', err);
         scrapingState.status = `❌ Auto-save failed: ${err.message}`;

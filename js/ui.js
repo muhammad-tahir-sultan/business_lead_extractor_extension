@@ -29,7 +29,7 @@ const UI = {
     updateFromState(state) {
         State.data = state.data || [];
 
-        this.setStatus(state.status);
+        this.setStatusHTML(state.status);
 
         const scraping = Boolean(state.isScraping);
         this.el('start-btn').style.display = scraping ? 'none' : 'flex';
