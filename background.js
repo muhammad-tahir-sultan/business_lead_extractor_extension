@@ -17,13 +17,88 @@ let scrapingState = {
 // Load state from storage on startup
 chrome.storage.local.get(['savedScrapingState'], (result) => {
     if (result.savedScrapingState) {
-        scrapingState = { ...scrapingState, ...result.savedScrapingState, isScraping: false }; // Never start in scraping mode
-        scrapingState.status = scrapingState.data.length > 0 ? `Ready. ${scrapingState.data.length} records in memory.` : 'Ready to extract premium leads...';
+        scrapingState = { ...scrapingState, ...result.savedScrapingState };
+        if (!scrapingState.isScraping && scrapingState.data.length > 0) {
+            scrapingState.status = `Ready. ${scrapingState.data.length} records in memory.`;
+        }
     }
 });
 
 function saveState() {
     chrome.storage.local.set({ savedScrapingState: scrapingState });
+}
+
+// ── Background Auto-Save helper ────────────────────────────────────────────────
+async function executeAutoSaveInBackground(data, keyword) {
+    if (!data || !data.length) return false;
+
+    const storage = await chrome.storage.local.get(['autoSavePref', 'webAppUrl']);
+    const pref = storage.autoSavePref;
+    const webAppUrl = storage.webAppUrl;
+
+    if (!pref || !pref.enabled) return false;
+
+    if (!webAppUrl) {
+        scrapingState.status = 'Auto-save failed: No Web App URL set in Export settings.';
+        saveState();
+        chrome.runtime.sendMessage({ action: 'ui_update', state: scrapingState }).catch(() => { });
+        return true;
+    }
+
+    scrapingState.status = `⏳ Auto-saving ${data.length} records to Google Sheets...`;
+    saveState();
+    chrome.runtime.sendMessage({ action: 'ui_update', state: scrapingState }).catch(() => { });
+
+    const rows = data.map(item => ({
+        name: item.name || '',
+        rating: item.rating || '',
+        reviews: item.reviews || '',
+        url: item.url || '',
+        website: item.website || '',
+        phone: item.contact || '',
+        email: item.emails || '',
+        text_snippet: '',
+        'Sent Status': '',
+        'Next Follow-Up Date': '',
+        'Follow-Up Stage': '',
+        date_scraped: new Date().toISOString().split('T')[0],
+        source: 'Google Maps Scraper',
+        notes: '',
+        'Linkedin URL': item.linkedin || '',
+        Facebook: item.facebook || '',
+    }));
+
+    try {
+        let payload;
+        if (pref.mode === 'append') {
+            const sheetName = pref.sheet || 'Sheet1';
+            payload = { action: 'append', data: rows, sheetName };
+        } else {
+            const tabName = (keyword || 'Leads').slice(0, 28) + ' – ' + new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+            payload = { action: 'new_tab', data: rows, tabName };
+        }
+
+        const res = await fetch(webAppUrl, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        });
+        const result = await res.json();
+
+        if (result.status !== 'success') throw new Error(result.message);
+
+        scrapingState.status = `✅ Auto-saved! ${rows.length} rows → ${result.url || 'Sheet'}`;
+    } catch (err) {
+        console.error('Background Auto-save failed:', err);
+        scrapingState.status = `❌ Auto-save failed: ${err.message}`;
+    }
+
+    saveState();
+    chrome.runtime.sendMessage({ action: 'ui_update', state: scrapingState }).catch(() => { });
+
+    // Also broadcast a small event so the popup toggle UI indicator can show ✅ or ❌ if open
+    chrome.runtime.sendMessage({ action: 'auto_save_done', status: scrapingState.status }).catch(() => { });
+    return true;
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -108,6 +183,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 
     if (request.action === 'status_update') {
+        scrapingState.isScraping = true;
         scrapingState.status = request.message;
 
         if (request.progress !== undefined) {
@@ -134,18 +210,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'scraping_complete') {
         scrapingState.isScraping = false;
         scrapingState.data = request.data;
+        const kw = scrapingState.keyword;
 
         const s = request.stats || {};
         const n = s.total ?? request.data.length;
-        scrapingState.status = n === 0
+        const baseStatus = n === 0
             ? 'Done! No records found.'
             : `✅ Done! ${n} scraped`
             + `  ·  📞 ${s.phone ?? '?'}/${n}`
             + `  ·  🌐 ${s.web ?? '?'}/${n}`
             + `  ·  📧 ${s.email ?? '?'}/${n}`;
 
+        scrapingState.status = baseStatus;
         saveState();
         chrome.runtime.sendMessage({ action: 'ui_update', state: scrapingState }).catch(() => { });
+
+        // Trigger AutoSave in background (does nothing if toggle is off)
+        executeAutoSaveInBackground(request.data, kw);
     }
 
 

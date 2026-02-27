@@ -59,60 +59,6 @@ const AutoSave = (() => {
         }
     }
 
-    // ── Auto-save executor (called from ui_update when scraping finishes) ─────
-
-    async function execute(data) {
-        if (!_pref.enabled || !data || !data.length) return;
-
-        const { webAppUrl } = await Storage.get(['webAppUrl']);
-        if (!webAppUrl) { UI.setStatus('Auto-save: no Web App URL set.'); return; }
-
-        // Format rows the same way as Export
-        const rows = data.map(item => ({
-            name: item.name || '',
-            rating: item.rating || '',
-            reviews: item.reviews || '',
-            url: item.url || '',
-            website: item.website || '',
-            phone: item.contact || '',
-            email: item.emails || '',
-            text_snippet: '',
-            'Sent Status': '',
-            'Next Follow-Up Date': '',
-            'Follow-Up Stage': '',
-            date_scraped: new Date().toISOString().split('T')[0],
-            source: 'Google Maps Scraper',
-            notes: '',
-            'Linkedin URL': item.linkedin || '',
-            Facebook: item.facebook || '',
-        }));
-
-        const indicator = el('auto-save-indicator');
-        if (indicator) { indicator.textContent = '⏳ Auto-saving…'; indicator.style.color = '#f59e0b'; }
-
-        try {
-            let result;
-            if (_pref.mode === 'append') {
-                const sheetName = _pref.sheet || el('auto-save-sheet-select').value;
-                result = await SheetsAPI.sendData(webAppUrl, 'append', rows, { sheetName });
-            } else {
-                const keyword = el('keyword') ? el('keyword').value.trim() : 'Leads';
-                const tabName = keyword.slice(0, 28) + ' – ' + new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-                result = await SheetsAPI.sendData(webAppUrl, 'new_tab', rows, { tabName });
-            }
-
-            if (result.status !== 'success') throw new Error(result.message);
-
-            if (indicator) { indicator.textContent = `✅ Auto-saved ${rows.length} rows`; indicator.style.color = '#34d399'; }
-            UI.setStatusHTML(
-                `✅ Auto-saved! ${rows.length} rows → <a href="${result.url}" target="_blank" style="color:#6366f1;">Open Sheet ↗</a>`
-            );
-        } catch (err) {
-            if (indicator) { indicator.textContent = '❌ Auto-save failed'; indicator.style.color = '#f87171'; }
-            console.error('Auto-save failed:', err);
-        }
-    }
-
     // ── Public API ────────────────────────────────────────────────────────────
 
     return {
@@ -144,7 +90,6 @@ const AutoSave = (() => {
             });
         },
 
-        execute,
         get enabled() { return _pref.enabled; },
     };
 })();

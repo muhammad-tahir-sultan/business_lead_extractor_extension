@@ -16,16 +16,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // Live updates from background while popup is open
     let _wasScraping = false;
     chrome.runtime.onMessage.addListener((req) => {
-        if (req.action !== 'ui_update') return;
-        const state = req.state;
-
-        // Detect transition: scraping → done  → trigger auto-save
-        if (_wasScraping && !state.isScraping && state.data && state.data.length) {
-            AutoSave.execute(state.data);
+        if (req.action === 'ui_update') {
+            const state = req.state;
+            _wasScraping = Boolean(state.isScraping);
+            UI.updateFromState(state);
         }
-        _wasScraping = Boolean(state.isScraping);
-
-        UI.updateFromState(state);
+        if (req.action === 'auto_save_done') {
+            const ind = document.getElementById('auto-save-indicator');
+            if (ind) {
+                if (req.status.includes('✅')) { ind.textContent = '✅ Saved'; ind.style.color = '#34d399'; }
+                else if (req.status.includes('❌')) { ind.textContent = '❌ Failed'; ind.style.color = '#f87171'; }
+            }
+        }
     });
 
     // ── Button wiring ─────────────────────────────────────────────────────────
