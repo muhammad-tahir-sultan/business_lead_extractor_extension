@@ -12,15 +12,13 @@
 }
 
 body {
-    width: 650px;
+    width: 780px;
     height: 600px;
-    /* Chrome maximum height */
     margin: 0;
     font-family: 'Outfit', sans-serif;
     background: var(--bg-dark);
     color: var(--text-main);
     overflow: hidden;
-    /* Prevent any scrolling */
 }
 
 /* Hide scrollbars for a cleaner look */

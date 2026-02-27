@@ -6,6 +6,13 @@
     <title>LeadGen Maps ⚡</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="popup.css">
+    <style>
+        /* Force dark background on native select option lists */
+        select option {
+            background: #1a2035;
+            color: #f8fafc;
+        }
+    </style>
 </head>
 
 <body>
@@ -236,6 +243,19 @@
                 </button>
             </div>
 
+            <button id="view-sheet-btn" class="export-btn"
+                style="grid-column: 1 / -1; border-color: rgba(99,102,241,0.4); color: #a5b4fc;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="8" y1="13" x2="16" y2="13"></line>
+                    <line x1="8" y1="17" x2="16" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+                View Sheet Data
+            </button>
+
             <button id="whatsapp-blast-btn" class="whatsapp-btn" style="margin-top: 8px;" disabled>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                     stroke-linecap="round" stroke-linejoin="round">
@@ -259,7 +279,7 @@
             </div>
         </div>
 
-        <!-- Sheet Selector Modal -->
+        <!-- Sheet Selector Modal (Append) -->
         <div id="sheet-selector-modal" class="library-view" style="display: none; padding: 24px; z-index: 3000;">
             <div class="library-header" style="margin-bottom: 20px;">
                 <h2 style="font-size: 16px; margin: 0; color: white;">Select Sheet to Append</h2>
@@ -298,6 +318,104 @@
             </div>
         </div>
 
+        <!-- View Sheet Data Modal -->
+        <div id="view-sheet-modal"
+            style="display:none; position:fixed; inset:0; z-index:4000; background:rgba(8,10,20,0.97); flex-direction:column; overflow:hidden;">
+            <!-- Modal Header -->
+            <div
+                style="display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid rgba(255,255,255,0.08); flex-shrink:0;">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="8" y1="13" x2="16" y2="13"></line>
+                        <line x1="8" y1="17" x2="16" y2="17"></line>
+                    </svg>
+                    <div>
+                        <div style="font-size:15px; font-weight:600; color:white;">Sheet Data Viewer</div>
+                        <div id="view-sheet-subtitle"
+                            style="font-size:11px; color:rgba(255,255,255,0.4); margin-top:1px;">Loading...</div>
+                    </div>
+                    <span id="view-sheet-row-badge"
+                        style="display:none; background:rgba(99,102,241,0.2); color:#a5b4fc; font-size:11px; font-weight:600; padding:3px 10px; border-radius:20px; border:1px solid rgba(99,102,241,0.3);"></span>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <!-- Sheet tab selector -->
+                    <div style="position:relative;">
+                        <select id="view-sheet-select"
+                            style="padding:8px 32px 8px 12px; border-radius:8px; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); color:white; font-family:'Outfit',sans-serif; font-size:12px; appearance:none; cursor:pointer; outline:none;">
+                        </select>
+                        <div
+                            style="position:absolute; right:10px; top:10px; pointer-events:none; color:rgba(255,255,255,0.5);">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </div>
+                    </div>
+                    <!-- Search -->
+                    <div style="position:relative;">
+                        <svg style="position:absolute; left:10px; top:50%; transform:translateY(-50%); color:rgba(255,255,255,0.35);"
+                            width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                        <input id="view-sheet-search" type="text" placeholder="Search rows..." autocomplete="off"
+                            style="padding:8px 12px 8px 30px; border-radius:8px; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); color:white; font-family:'Outfit',sans-serif; font-size:12px; outline:none; width:160px;">
+                    </div>
+                    <button id="close-view-sheet-btn"
+                        style="background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); color:rgba(255,255,255,0.7); width:32px; height:32px; border-radius:8px; cursor:pointer; font-size:18px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">&times;</button>
+                </div>
+            </div>
+
+            <!-- Loading State -->
+            <div id="view-sheet-loading"
+                style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; color:rgba(255,255,255,0.4);">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite;">
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+                </svg>
+                <span style="font-size:13px;">Fetching sheet data...</span>
+            </div>
+
+            <!-- Error State -->
+            <div id="view-sheet-error"
+                style="display:none; flex:1; flex-direction:column; align-items:center; justify-content:center; gap:10px; color:rgba(255,255,255,0.5); padding:24px; text-align:center;">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <div id="view-sheet-error-msg" style="font-size:13px; color:#fca5a5;"></div>
+                <button id="view-sheet-retry-btn"
+                    style="margin-top:8px; padding:8px 20px; border-radius:8px; background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3); color:#a5b4fc; font-size:12px; cursor:pointer; font-family:'Outfit',sans-serif;">Retry</button>
+            </div>
+
+            <!-- Empty State -->
+            <div id="view-sheet-empty"
+                style="display:none; flex:1; flex-direction:column; align-items:center; justify-content:center; gap:10px; color:rgba(255,255,255,0.4); padding:24px; text-align:center;">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)"
+                    stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                </svg>
+                <div style="font-size:13px;">No data found in this sheet tab.</div>
+            </div>
+
+            <!-- Table Container -->
+            <div id="view-sheet-table-wrap" style="display:none; flex:1; overflow:auto; padding:0;">
+                <table id="view-sheet-table"
+                    style="width:100%; border-collapse:collapse; font-size:12px; min-width:600px;">
+                    <thead id="view-sheet-thead" style="position:sticky; top:0; z-index:10; background:#0f1120;">
+                    </thead>
+                    <tbody id="view-sheet-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+
         <div class="footer">
             <span>Powered by LeadGen v2.0</span>
         </div>
@@ -305,7 +423,19 @@
 
     <script src="xlsx.min.js"></script>
     <script src="locations-data.js"></script>
-    <script src="popup.js"></script>
+    <!-- Modules (load order matters: data → core → features → boot) -->
+    <script src="js/data.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/state.js"></script>
+    <script src="js/sheets-api.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/scraper.js"></script>
+    <script src="js/export.js"></script>
+    <script src="js/library.js"></script>
+    <script src="js/location.js"></script>
+    <script src="js/sheet-viewer.js"></script>
+    <script src="js/sheet-append.js"></script>
+    <script src="js/main.js"></script>
 </body>
 
 </html>
