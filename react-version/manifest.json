@@ -1,0 +1,51 @@
+{
+    "manifest_version": 3,
+    "name": "Maps Premium Scraper (React)",
+    "version": "1.0.0",
+    "description": "Premium Local Business Scraper with WhatsApp Blast Integration (React Version)",
+    "action": {
+        "default_popup": "index.html"
+    },
+    "background": {
+        "service_worker": "src/background/index.ts",
+        "type": "module"
+    },
+    "permissions": [
+        "storage",
+        "tabs",
+        "scripting"
+    ],
+    "host_permissions": [
+        "https://www.google.com/maps*",
+        "https://web.whatsapp.com/*"
+    ],
+    "content_scripts": [
+        {
+            "matches": [
+                "https://www.google.com/maps*"
+            ],
+            "js": [
+                "src/content/maps.ts"
+            ]
+        },
+        {
+            "matches": [
+                "https://web.whatsapp.com/*"
+            ],
+            "js": [
+                "src/content/whatsapp.ts"
+            ],
+            "run_at": "document_end"
+        }
+    ],
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "assets/*"
+            ],
+            "matches": [
+                "<all_urls>"
+            ]
+        }
+    ]
+}
